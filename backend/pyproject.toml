@@ -1,0 +1,19 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.120.0",
+    "fastapi>=0.140.13",
+    "groq>=1.6.0",
+    "httpx>=0.28.1",
+    "jsondiff>=2.2.1",
+    "pydantic>=2.13.4",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.2.2",
+    "ruff>=0.16.0",
+    "supabase>=2.31.0",
+    "uvicorn>=0.51.0",
+]
