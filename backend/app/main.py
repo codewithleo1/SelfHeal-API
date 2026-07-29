@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routers import github
+
 load_dotenv()
 
 app = FastAPI(
@@ -12,7 +14,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — only allow requests from the configured frontend URL
 allowed_origins = [
     os.getenv("FRONTEND_URL", "http://localhost:5173"),
 ]
@@ -24,6 +25,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+app.include_router(github.router)
 
 
 @app.get("/api/health")
