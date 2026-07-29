@@ -7,12 +7,13 @@
 ## Overall Progress
 
 ```
-Phase 1 — Foundation        [ ] 0%
-Phase 2 — Agent Core        [ ] 0%
-Phase 3 — SaaS Layer        [ ] 0%
-Phase 4 — Deploy & Polish   [ ] 0%
+Phase 0 — Standards & Scaffolding   [x] 100%
+Phase 1 — Foundation                [x] 100%
+Phase 2 — Agent Core                [x] 100%
+Phase 3 — SaaS Layer                [ ] 0%
+Phase 4 — Deploy & Polish           [ ] 0%
 
-Total: [ ] 0% Complete
+Total: [x] 60% Complete
 ```
 
 > Update each `[ ]` to `[x]` as tasks are completed.
@@ -20,12 +21,12 @@ Total: [ ] 0% Complete
 
 ---
 ### Phase 0 — Standards & Scaffolding (before Phase 1)
-  - Sentry setup
-  - GitHub Actions CI pipeline
-  - Structured logging setup
-  - CORS + rate limiting config
-  - API versioning
-  - Data retention policy document
+  - [x]  Sentry setup
+  - [x]  GitHub Actions CI pipeline
+  - [x]  Structured logging setup
+  - [x]  CORS + rate limiting config
+  - [x]  API versioning
+  - [x]  Data retention policy document
 
 ## Phase 1 — Foundation & Project Setup
 **Target:** Week 1 (Days 1–7)
@@ -34,30 +35,30 @@ Total: [ ] 0% Complete
 ### Tasks
 
 #### 1.1 Repository & Tooling
-- [ ] Create GitHub repo: `selfheal-api`
-- [ ] Initialize frontend: `npm create vite@latest frontend -- --template react-ts`
-- [ ] Initialize backend: `mkdir backend && cd backend && python -m venv venv`
-- [ ] Install backend deps: `fastapi uvicorn httpx python-dotenv supabase pydantic`
-- [ ] Set up `.env.example` with all required keys
-- [ ] Add `.gitignore` (exclude `.env`, `venv/`, `node_modules/`)
-- [ ] Write base `README.md` with project description
+- [x] Create GitHub repo: `selfheal-api`
+- [x] Initialize frontend: `npm create vite@latest frontend -- --template react-ts`
+- [x] Initialize backend: `mkdir backend && cd backend && python -m venv venv`
+- [x] Install backend deps: `fastapi uvicorn httpx python-dotenv supabase pydantic`
+- [x] Set up `.env.example` with all required keys
+- [x] Add `.gitignore` (exclude `.env`, `venv/`, `node_modules/`)
+- [x] Write base `README.md` with project description
 
 #### 1.2 GitHub OAuth
-- [ ] Create GitHub OAuth App in GitHub Developer Settings
-- [ ] Implement `/api/github/oauth` callback route in FastAPI
-- [ ] Exchange code for access token, store in Supabase session
-- [ ] Frontend: "Login with GitHub" button → redirect flow
-- [ ] Test: user can log in and see their GitHub username in UI
+- [x] Create GitHub OAuth App in GitHub Developer Settings
+- [x] Implement `/api/github/oauth` callback route in FastAPI
+- [x] Exchange code for access token, store in Supabase session
+- [x] Frontend: "Login with GitHub" button → redirect flow
+- [x] Test: user can log in and see their GitHub username in UI
 
 #### 1.3 Supabase Setup
-- [ ] Create Supabase project (free tier)
-- [ ] Run `jobs` table migration SQL
-- [ ] Run `agent_steps` table migration SQL
-- [ ] Test: FastAPI can insert and query a dummy job row
+- [x] Create Supabase project (free tier)
+- [x] Run `jobs` table migration SQL
+- [x] Run `agent_steps` table migration SQL
+- [x] Test: FastAPI can insert and query a dummy job row
 
 #### 1.4 Frontend Shell
-- [ ] Landing page with hero section and "Try Demo" CTA
-- [ ] Dashboard page (protected route — requires GitHub login)
+- [x] Landing page with hero section and "Try Demo" CTA
+- [x] Dashboard page (protected route — requires GitHub login)
 - [ ] Job creation page (`/jobs/new`) with form fields:
   - Paste error log textarea
   - GitHub repo URL input
@@ -65,7 +66,7 @@ Total: [ ] 0% Complete
 - [ ] Deploy frontend to Vercel — confirm live URL works
 - [ ] Deploy backend to Railway — confirm `/api/health` returns 200
 
-**Phase 1 Done When:** User can log in with GitHub, fill the form, and the job is saved to Supabase with status `queued`.
+**Phase 1 Done** 
 
 ---
 
@@ -76,47 +77,46 @@ Total: [ ] 0% Complete
 ### Tasks
 
 #### 2.1 Step 1 — Detect (Log Analyzer)
-- [ ] Write `backend/app/agent/detect.py`
-- [ ] Write `llm_client.py` — LLMClient class with Claude primary + Groq fallback
-- [ ] Prompt Claude with: error log → extract endpoint, method, failing field
-- [ ] Return structured JSON: `{ endpoint, method, failing_field, vendor }`
-- [ ] Unit test with 3 sample error logs (Stripe, Twilio, generic REST)
-- [ ] Edge case: malformed/incomplete logs — return `{ status: "insufficient_data" }`
+- [x] Write `backend/app/agent/detect.py`
+- [x] Write `llm_client.py` — LLMClient class with Claude primary + Groq fallback
+- [x] Prompt Claude with: error log → extract endpoint, method, failing field
+- [x] Return structured JSON: `{ endpoint, method, failing_field, vendor }`
+- [x] Unit test with 3 sample error logs (Stripe, Twilio, generic REST)
+- [x] Edge case: malformed/incomplete logs — return `{ status: "insufficient_data" }`
 
 #### 2.2 Step 2 — Crawl (OpenAPI Fetcher + Differ)
-- [ ] Write `backend/app/agent/crawl.py`
-- [ ] Build vendor → OpenAPI URL lookup map (Stripe, Twilio, Shopify, etc.)
-- [ ] `httpx` fetch of OpenAPI spec URL
-- [ ] `jsondiff` between old schema (from repo type defs) and new spec
-- [ ] Claude summarizes the diff in plain English
-- [ ] Unit test with Stripe spec (public, stable URL)
-- [ ] Fallback: if no spec found → Claude extracts from vendor migration blog URL
+- [x] Write `backend/app/agent/crawl.py`
+- [x] Build vendor → OpenAPI URL lookup map (Stripe, Twilio, Shopify, etc.)
+- [x] `httpx` fetch of OpenAPI spec URL
+- [x] `jsondiff` between old schema (from repo type defs) and new spec
+- [x] Claude summarizes the diff in plain English
+- [x] Unit test with Stripe spec (public, stable URL)
+- [x] Fallback: if no spec found → Claude extracts from vendor migration blog URL
 
 #### 2.3 Step 3 — Patch (Code Rewriter)
-- [ ] Write `backend/app/agent/patch.py`
-- [ ] GitHub API: fetch raw file content from user's repo
-- [ ] Prompt Claude with: original code + diff summary + migration notes
-- [ ] Claude returns ONLY the rewritten function (not entire file)
-- [ ] Replace function in original file string using AST node replacement
-- [ ] Validate output: `ast.parse()` for Python, `tsc --noEmit` for TypeScript
-- [ ] Unit test with a sample broken Stripe payment mapper (Python)
-- [ ] Unit test with a sample broken Stripe payment mapper (TypeScript)
+- [x] Write `backend/app/agent/patch.py`
+- [x] GitHub API: fetch raw file content from user's repo
+- [x] Prompt Claude with: original code + diff summary + migration notes
+- [x] Claude returns ONLY the rewritten function (not entire file)
+- [x] Replace function in original file string using AST node replacement
+- [x] Validate output: `ast.parse()` for Python, `tsc --noEmit` for TypeScript
+- [x] Unit test with a sample broken Stripe payment mapper (Python)
+- [x] Unit test with a sample broken Stripe payment mapper (TypeScript)
 
 #### 2.4 Step 4 — PR Creator
-- [ ] Write `backend/app/agent/pr.py`
-- [ ] GitHub API: create branch `selfheal/fix-{endpoint}-{timestamp}`
-- [ ] GitHub API: push patched file to branch
-- [ ] Run lint: `subprocess.run(["ruff", "check", filepath], timeout=30)`
-- [ ] GitHub API: create Pull Request with full body (old schema, new schema, Claude's reasoning)
-- [ ] Unit test: PR actually appears in a test repo
-- [ ] Store PR URL in Supabase `jobs` table
-
+- [x] Write `backend/app/agent/pr.py`
+- [x] GitHub API: create branch `selfheal/fix-{endpoint}-{timestamp}`
+- [x] GitHub API: push patched file to branch
+- [x] Run lint: `subprocess.run(["ruff", "check", filepath], timeout=30)`
+- [x] GitHub API: create Pull Request with full body (old schema, new schema, Claude's reasoning)
+- [x] Unit test: PR actually appears in a test repo
+- [x] Store PR URL in Supabase `jobs` table
 #### 2.5 End-to-End Agent Test
-- [ ] Write `backend/tests/test_full_pipeline.py`
-- [ ] Run all 4 steps against a real test repo with a seeded broken file
-- [ ] Confirm: PR is opened, link is returned, all steps logged in `agent_steps` table
+- [x] Write `backend/tests/test_full_pipeline.py`
+- [x] Run all 4 steps against a real test repo with a seeded broken file
+- [x] Confirm: PR is opened, link is returned, all steps logged in `agent_steps` table
 
-**Phase 2 Done When:** Running `python test_full_pipeline.py` opens a real GitHub PR.
+**Phase 2 Done**
 
 ---
 
@@ -208,7 +208,9 @@ Total: [ ] 0% Complete
 | Jul 2026 | Use Railway over Render | Better free tier for persistent background workers |
 | Jul 2026 | Use Claude claude-sonnet-4-6 | Best balance of speed and reasoning for code tasks |
 | Jul 2026 | No LangChain | Adds complexity; custom agent loop is more educational |
-| — | — | — |
+| Jul 2026 | Use Groq dual-key rotation instead of Claude | Anthropic requires paid credits; Groq free tier sufficient for dev |
+| Jul 2026 | Use llama-3.3-70b-versatile | llama-3.1-70b-versatile was decommissioned by Groq |
+| Jul 2026 | Use classic GitHub token for agent | Fine-grained tokens require explicit repo selection; classic token simpler for dev |
 
 > Add a row here every time you make a significant technical decision.
 
@@ -218,7 +220,10 @@ Total: [ ] 0% Complete
 
 | Date | Blocker | Status | Resolution |
 |---|---|---|---|
-| — | — | — | — |
+| Jul 2026 | Groq model llama-3.1-70b-versatile decommissioned | Resolved | Switched to llama-3.3-70b-versatile |
+| Jul 2026 | GitHub fine-grained token had no repo permissions | Resolved | Switched to classic token with repo scope |
+| Jul 2026 | oxlint parser rejected emoji in TSX | Resolved | Removed emoji from JSX components |
+| Jul 2026 | react-router-dom audit vulnerabilities | Resolved | SSR-only CVEs, not applicable to client-side app |
 
 > Log any blockers here so you can reference them later.
 
