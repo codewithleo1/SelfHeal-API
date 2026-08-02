@@ -34,9 +34,21 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-800">
         <span className="text-xl font-bold text-green-400">SelfHeal-API</span>
-        <span className="text-gray-400 text-sm">
-          Logged in as <span className="text-white font-semibold">{displayUser}</span>
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-400 text-sm">
+            Logged in as <span className="text-white font-semibold">{displayUser}</span>
+          </span>
+          <button
+            onClick={() => {
+              localStorage.removeItem('gh_token')
+              localStorage.removeItem('gh_user')
+              window.location.href = '/'
+            }}
+            className="text-sm text-gray-500 hover:text-red-400 transition"
+          >
+            Logout
+          </button>
+        </div>
       </nav>
       <main className="flex flex-col items-center justify-center flex-1 px-8 gap-6">
         <h1 className="text-3xl font-bold">Welcome, {displayUser}!</h1>
