@@ -37,8 +37,8 @@ def test_detect():
 
 
 def test_crawl():
-    from app.agent.detect import detect
     from app.agent.crawl import crawl
+    from app.agent.detect import detect
     detect_result = detect(ERROR_LOG)
     result = crawl(
         endpoint=detect_result["endpoint"],
@@ -50,8 +50,8 @@ def test_crawl():
 
 
 def test_patch():
-    from app.agent.detect import detect
     from app.agent.crawl import crawl
+    from app.agent.detect import detect
     from app.agent.patch import patch
     assert GITHUB_TOKEN, "GITHUB_TOKEN not set"
     detect_result = detect(ERROR_LOG)
@@ -76,8 +76,8 @@ def test_patch():
 
 
 def test_full_pipeline():
-    from app.agent.detect import detect
     from app.agent.crawl import crawl
+    from app.agent.detect import detect
     from app.agent.patch import patch
     from app.agent.pr import create_pr
     assert GITHUB_TOKEN, "GITHUB_TOKEN not set"
