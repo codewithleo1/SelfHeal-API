@@ -1,7 +1,7 @@
 import json
 import os
-import time
 import threading
+import time
 
 from dotenv import load_dotenv
 from upstash_redis import Redis
@@ -39,7 +39,7 @@ def process_job(job: dict) -> None:
             github_token=job["github_token"],
         )
         print(f"[worker] Job {job.get('job_id')} finished: {result.get('status')}")
-    except Exception as e:
+    except RuntimeError as e:
         print(f"[worker] Job {job.get('job_id')} crashed: {e}")
 
 
@@ -57,7 +57,7 @@ def run_worker() -> None:
             else:
                 # No jobs — wait 2 seconds before polling again
                 time.sleep(2)
-        except Exception as e:
+        except RuntimeError as e:
             print(f"[worker] Error: {e}")
             time.sleep(2)
 

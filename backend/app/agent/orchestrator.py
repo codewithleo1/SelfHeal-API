@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.agent.crawl import crawl
 from app.agent.detect import detect
@@ -29,7 +29,7 @@ def _update_job(job_id: str, status: str, pr_url: str | None = None, patch_diff:
         db = get_db()
         payload = {
             "status": status,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
         if pr_url:
             payload["pr_url"] = pr_url

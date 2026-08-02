@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -145,7 +145,7 @@ def create_pr(
         dict with keys: pr_url, branch_name, status
     """
     repo = repo_url.replace("https://github.com/", "").rstrip("/")
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     branch_name = f"selfheal/fix-{timestamp}"
 
     try:
