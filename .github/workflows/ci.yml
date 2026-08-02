@@ -27,4 +27,10 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: uv run pytest tests/ -v || [ $? -eq 5 ]
+        env:
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: uv run pytest tests/ -v
