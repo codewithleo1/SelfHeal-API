@@ -4,7 +4,6 @@ Runs all 4 steps against a real GitHub repo with a seeded broken file.
 """
 import json
 import os
-import uuid
 
 from dotenv import load_dotenv
 
@@ -107,6 +106,6 @@ if __name__ == "__main__":
     pr = test_pr(p, d, c)
 
     print("\n═" * 50)
-    print(f"ALL STEPS PASSED")
+    print("ALL STEPS PASSED")
     print(f"PR URL: {pr['pr_url']}")
     print("═" * 50)

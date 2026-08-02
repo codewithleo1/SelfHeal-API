@@ -15,5 +15,6 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "ruff>=0.16.0",
     "supabase>=2.31.0",
+    "upstash-redis>=1.7.0",
     "uvicorn>=0.51.0",
 ]

@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import github
+from app.queue.worker import start_worker_thread
+from app.routers import github, jobs
 
 load_dotenv()
 
@@ -27,6 +28,12 @@ app.add_middleware(
 )
 
 app.include_router(github.router)
+app.include_router(jobs.router)
+
+
+@app.on_event("startup")
+async def startup():
+    start_worker_thread()
 
 
 @app.get("/api/health")
