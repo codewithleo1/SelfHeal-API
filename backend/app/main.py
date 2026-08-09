@@ -17,6 +17,7 @@ app = FastAPI(
 
 allowed_origins = [
     os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    "https://self-heal-api.vercel.app",
 ]
 
 app.add_middleware(
