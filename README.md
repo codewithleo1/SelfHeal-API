@@ -164,6 +164,7 @@ selfheal-api/
 
 ## Roadmap
 
+- [ ] **Auto file detection** — agent searches the repo automatically to find the broken file and function; user only needs to paste the error log and repo URL (v2 priority)
 - [ ] TypeScript support (currently Python only)
 - [ ] Webhook integration (auto-trigger on API gateway alerts)
 - [ ] Support for more vendors (Plaid, SendGrid, Twilio)
