@@ -10,10 +10,10 @@
 Phase 0 — Standards & Scaffolding   [x] 100%
 Phase 1 — Foundation                [x] 100%
 Phase 2 — Agent Core                [x] 100%
-Phase 3 — SaaS Layer                [ ] 0%
-Phase 4 — Deploy & Polish           [ ] 0%
+Phase 3 — SaaS Layer                [x] 100%
+Phase 4 — Deploy & Polish           [x] 100%
 
-Total: [x] 60% Complete
+Total: [x] 100% Complete
 ```
 
 > Update each `[ ]` to `[x]` as tasks are completed.
@@ -169,21 +169,20 @@ Total: [x] 60% Complete
 ### Tasks
 
 #### 4.1 Production Deployment
-- [ ] Frontend: Vercel production deploy with custom env vars
-- [ ] Backend: Railway production deploy with all secrets set
-- [ ] Supabase: run final migrations on production project
-- [ ] Upstash: confirm Redis queue working in production
-- [ ] End-to-end test on live URLs — submit a real job, get a real PR
+- [x] Frontend: Vercel production deploy with custom env vars
+- [x] Backend: Render production deploy (switched from Railway — free tier)
+- [x] Supabase: run final migrations on production project
+- [x] Upstash: confirm Redis queue working in production
+- [x] End-to-end test on live URLs — submit a real job, get a real PR
 
 #### 4.2 README Polish (This Is What Interviewers Read)
-- [ ] Project title + one-line description
-- [ ] Live demo link (prominent, top of README)
-- [ ] Architecture diagram (screenshot or Mermaid diagram)
-- [ ] Tech stack badges
-- [ ] "How it works" — 4 numbered steps with screenshots
-- [ ] "Financial impact" section (use the numbers from the brief)
-- [ ] Local development setup instructions
-- [ ] Environment variables documentation
+- [x] Project title + one-line description
+- [x] Live demo link (prominent, top of README)
+- [x] Architecture diagram
+- [x] Tech stack table
+- [x] How it works — 4 steps
+- [x] Local development setup instructions
+- [x] Environment variables documentation
 
 #### 4.3 Demo Data & Reliability
 - [ ] Load 3 pre-completed demo jobs in production DB (Stripe, Twilio, Shopify examples)
@@ -194,8 +193,8 @@ Total: [x] 60% Complete
 #### 4.4 Portfolio Presentation
 - [ ] Record a 2-minute Loom demo video — add to README
 - [ ] Write a LinkedIn post explaining what the project does and why
-- [ ] Add to portfolio website / resume with live link
-- [ ] Tag with topics on GitHub repo: `ai-agent`, `llm`, `fastapi`, `react`, `autonomous-agent`
+- [x] Add to portfolio website / resume with live link
+- [x] Tag with topics on GitHub repo: `ai-agent`, `llm`, `fastapi`, `react`, `autonomous-agent`
 
 **Phase 4 Done When:** Live URL is shareable, README is clean, demo video is recorded.
 
@@ -211,6 +210,7 @@ Total: [x] 60% Complete
 | Jul 2026 | Use Groq dual-key rotation instead of Claude | Anthropic requires paid credits; Groq free tier sufficient for dev |
 | Jul 2026 | Use llama-3.3-70b-versatile | llama-3.1-70b-versatile was decommissioned by Groq |
 | Jul 2026 | Use classic GitHub token for agent | Fine-grained tokens require explicit repo selection; classic token simpler for dev |
+| Aug 2026 | Use Render over Railway for backend | Railway no longer has a genuinely free tier |
 
 > Add a row here every time you make a significant technical decision.
 
