@@ -1,3 +1,4 @@
+# backend/app/agent/orchestrator.py
 from datetime import UTC, datetime
 
 from app.agent.crawl import crawl
@@ -5,6 +6,7 @@ from app.agent.detect import detect
 from app.agent.llm_client import LLMClient
 from app.agent.patch import patch
 from app.agent.pr import create_pr
+from app.agent.search import search
 from app.db.client import get_db
 
 
@@ -45,19 +47,15 @@ def run_agent(
     job_id: str,
     error_log: str,
     repo_url: str,
-    file_path: str,
-    function_name: str,
     github_token: str,
 ) -> dict:
     """
-    Run the full 4-step agent pipeline.
+    Run the full 5-step agent pipeline.
 
     Args:
         job_id: Supabase job UUID
         error_log: Raw error log from user
         repo_url: GitHub repo URL
-        file_path: Path to the file with the broken function
-        function_name: Name of the function to patch
         github_token: User's GitHub OAuth token
 
     Returns:
@@ -81,9 +79,30 @@ def run_agent(
         _update_job(job_id, "failed")
         return {"status": "failed", "reason": str(e)}
 
-    # Step 2 — Crawl
-    print(f"[job:{job_id}] Step 2 — Crawl")
-    _log_step(job_id, 2, "crawl", "running", {})
+    # Step 2 — Search (auto-find file and function)
+    print(f"[job:{job_id}] Step 2 — Search")
+    _log_step(job_id, 2, "search", "running", {})
+    try:
+        search_result = search(
+            repo_url=repo_url,
+            endpoint=detect_result.get("endpoint", ""),
+            vendor=detect_result.get("vendor", ""),
+            github_token=github_token,
+            llm=llm,
+        )
+        if search_result.get("status") == "not_found":
+            _log_step(job_id, 2, "search", "error", search_result)
+            _update_job(job_id, "failed")
+            return {"status": "failed", "reason": "Could not locate the broken file in repo", "detail": search_result}
+        _log_step(job_id, 2, "search", "done", search_result)
+    except Exception as e:
+        _log_step(job_id, 2, "search", "error", {"error": str(e)})
+        _update_job(job_id, "failed")
+        return {"status": "failed", "reason": str(e)}
+
+    # Step 3 — Crawl
+    print(f"[job:{job_id}] Step 3 — Crawl")
+    _log_step(job_id, 3, "crawl", "running", {})
     try:
         crawl_result = crawl(
             endpoint=detect_result.get("endpoint", ""),
@@ -91,45 +110,45 @@ def run_agent(
             failing_field=detect_result.get("failing_field", ""),
             llm=llm,
         )
-        _log_step(job_id, 2, "crawl", "done", crawl_result)
+        _log_step(job_id, 3, "crawl", "done", crawl_result)
     except Exception as e:
-        _log_step(job_id, 2, "crawl", "error", {"error": str(e)})
+        _log_step(job_id, 3, "crawl", "error", {"error": str(e)})
         _update_job(job_id, "failed")
         return {"status": "failed", "reason": str(e)}
 
-    # Step 3 — Patch
-    print(f"[job:{job_id}] Step 3 — Patch")
-    _log_step(job_id, 3, "patch", "running", {})
+    # Step 4 — Patch
+    print(f"[job:{job_id}] Step 4 — Patch")
+    _log_step(job_id, 4, "patch", "running", {})
     try:
         patch_result = patch(
             repo_url=repo_url,
-            file_path=file_path,
-            function_name=function_name,
+            file_path=search_result["file_path"],
+            function_name=search_result["function_name"],
             diff_summary=crawl_result.get("diff_summary", "API schema changed"),
             migration_notes=crawl_result.get("migration_notes", "Update the failing field"),
             github_token=github_token,
             llm=llm,
         )
         if patch_result.get("status") == "error":
-            _log_step(job_id, 3, "patch", "error", patch_result)
+            _log_step(job_id, 4, "patch", "error", patch_result)
             _update_job(job_id, "failed")
             return {"status": "failed", "reason": patch_result.get("reason")}
-        _log_step(job_id, 3, "patch", "done", {
+        _log_step(job_id, 4, "patch", "done", {
             "valid_syntax": patch_result.get("valid_syntax"),
             "confidence_score": patch_result.get("confidence_score"),
         })
     except Exception as e:
-        _log_step(job_id, 3, "patch", "error", {"error": str(e)})
+        _log_step(job_id, 4, "patch", "error", {"error": str(e)})
         _update_job(job_id, "failed")
         return {"status": "failed", "reason": str(e)}
 
-    # Step 4 — PR
-    print(f"[job:{job_id}] Step 4 — PR")
-    _log_step(job_id, 4, "pr", "running", {})
+    # Step 5 — PR
+    print(f"[job:{job_id}] Step 5 — PR")
+    _log_step(job_id, 5, "pr", "running", {})
     try:
         pr_result = create_pr(
             repo_url=repo_url,
-            file_path=file_path,
+            file_path=search_result["file_path"],
             patched_file=patch_result.get("patched_file", ""),
             endpoint=detect_result.get("endpoint", ""),
             diff_summary=crawl_result.get("diff_summary", ""),
@@ -137,11 +156,11 @@ def run_agent(
             github_token=github_token,
         )
         if pr_result.get("status") == "error":
-            _log_step(job_id, 4, "pr", "error", pr_result)
+            _log_step(job_id, 5, "pr", "error", pr_result)
             _update_job(job_id, "failed")
             return {"status": "failed", "reason": pr_result.get("reason")}
 
-        _log_step(job_id, 4, "pr", "done", pr_result)
+        _log_step(job_id, 5, "pr", "done", pr_result)
         _update_job(
             job_id,
             "completed",
@@ -155,6 +174,6 @@ def run_agent(
         }
 
     except Exception as e:
-        _log_step(job_id, 4, "pr", "error", {"error": str(e)})
+        _log_step(job_id, 5, "pr", "error", {"error": str(e)})
         _update_job(job_id, "failed")
         return {"status": "failed", "reason": str(e)}

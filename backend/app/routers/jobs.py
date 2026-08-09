@@ -1,3 +1,4 @@
+# backend/app/routers/jobs.py
 import uuid
 
 from dotenv import load_dotenv
@@ -15,8 +16,6 @@ router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 class JobCreate(BaseModel):
     repo_url: str
     error_log: str
-    file_path: str
-    function_name: str
 
 
 @router.post("")
@@ -25,19 +24,15 @@ async def create_job(
     authorization: str = Header(...),
 ):
     """Create a new remediation job and enqueue it."""
-    # Extract token and user from Authorization header
-    # Format: "Bearer <github_token>:<github_user>"
     try:
         token_part = authorization.replace("Bearer ", "")
         github_token, github_user = token_part.split(":")
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
-    # Validate repo URL
     if not body.repo_url.startswith("https://github.com/"):
         raise HTTPException(status_code=400, detail="repo_url must be a GitHub URL")
 
-    # Create job in Supabase
     job_id = str(uuid.uuid4())
     db = get_db()
     db.table("jobs").insert({
@@ -48,13 +43,10 @@ async def create_job(
         "status": "queued",
     }).execute()
 
-    # Enqueue for background processing
     enqueue({
         "job_id": job_id,
         "error_log": body.error_log,
         "repo_url": body.repo_url,
-        "file_path": body.file_path,
-        "function_name": body.function_name,
         "github_token": github_token,
     })
 

@@ -1,3 +1,4 @@
+// frontend/src/pages/NewJob.tsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -11,8 +12,6 @@ export default function NewJob() {
   const [form, setForm] = useState({
     repo_url: '',
     error_log: '',
-    file_path: '',
-    function_name: '',
   })
 
   const token = localStorage.getItem('gh_token')
@@ -31,8 +30,8 @@ export default function NewJob() {
 
   const handleSubmit = async () => {
     setError('')
-    if (!form.repo_url || !form.error_log || !form.file_path || !form.function_name) {
-      setError('All fields are required.')
+    if (!form.repo_url || !form.error_log) {
+      setError('Both fields are required.')
       return
     }
 
@@ -64,7 +63,12 @@ export default function NewJob() {
       </nav>
 
       <main className="flex flex-col items-center px-8 py-12 gap-6 max-w-2xl mx-auto w-full">
-        <h1 className="text-3xl font-bold self-start">New Remediation Job</h1>
+        <div className="w-full flex flex-col gap-2">
+          <h1 className="text-3xl font-bold">New Remediation Job</h1>
+          <p className="text-gray-400 text-sm">
+            Paste your error log and repo URL. The agent will automatically find the broken file and function.
+          </p>
+        </div>
 
         <div className="w-full flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -74,26 +78,6 @@ export default function NewJob() {
               placeholder="https://github.com/your-org/your-repo"
               value={form.repo_url}
               onChange={e => setForm({ ...form, repo_url: e.target.value })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-400">File Path</label>
-            <input
-              className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
-              placeholder="src/stripe_client.py"
-              value={form.file_path}
-              onChange={e => setForm({ ...form, file_path: e.target.value })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-400">Function Name to Fix</label>
-            <input
-              className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
-              placeholder="create_payment_intent"
-              value={form.function_name}
-              onChange={e => setForm({ ...form, function_name: e.target.value })}
             />
           </div>
 
