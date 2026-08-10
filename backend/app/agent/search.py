@@ -1,10 +1,13 @@
 # backend/app/agent/search.py
+import base64
+import json
+
 import httpx
 
 from app.agent.llm_client import LLMClient
 
 FUNCTION_FINDER_PROMPT = """You are a code analyst.
-Given a file's source code and a failing API endpoint, identify which function is responsible for calling that endpoint.
+Given a file's source code and a failing API endpoint or field, identify which function is responsible.
 
 You must respond with ONLY a valid JSON object. No explanation, no markdown, no code blocks.
 
@@ -24,25 +27,19 @@ def _extract_search_keyword(endpoint: str, vendor: str) -> str:
     Extract the best keyword to search for in source code.
     e.g. "https://api.stripe.com/v1/payment_intents" → "payment_intents"
     """
-    # Strip the base URL and use the last meaningful path segment
     path = (endpoint or "").rstrip("/")
     segments = [s for s in path.split("/") if s and not s.startswith("http") and "." not in s]
 
     if segments:
-        # Prefer the last non-version segment (skip "v1", "v2", etc.)
         for seg in reversed(segments):
             if not seg.startswith("v") or not seg[1:].isdigit():
                 return seg
 
-    # Fallback: use vendor name
     return vendor.lower().replace(" ", "_")
 
 
 def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) -> list[dict]:
-    """
-    Search GitHub code for a keyword in the given repo.
-    Returns list of {path, url} for matching files.
-    """
+    """Search GitHub code for a keyword in the given repo."""
     headers = {
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json",
@@ -70,11 +67,36 @@ def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) 
     return [{"path": item["path"], "url": item["git_url"]} for item in items]
 
 
-def _find_function_in_file(file_content: str, endpoint: str, llm: LLMClient) -> dict:
-    """Ask the LLM which function in the file calls the given endpoint."""
-    import json
+def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str) -> str:
+    """Fetch raw file content from GitHub."""
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
+
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.get(url, headers=headers)
+
+    resp.raise_for_status()
+
+    content_type = resp.headers.get("content-type", "")
+
+    # If response is plain text (raw file content)
+    if "application/json" not in content_type:
+        return resp.text
+
+    data = resp.json()
+    if data.get("encoding") == "base64":
+        return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
+    return data.get("content", "")
+
+
+def _find_function_in_file(file_content: str, hint: str, llm: LLMClient) -> dict:
+    """Ask the LLM which function in the file calls the given endpoint or uses the failing field."""
     prompt = (
-        f"Failing endpoint or field: {endpoint}\n\n"
+        f"Failing endpoint or field: {hint}\n\n"
         f"File content:\n```\n{file_content[:6000]}\n```\n\n"
         "Which function calls this endpoint or uses this field?"
     )
@@ -97,6 +119,21 @@ def search(
     llm: LLMClient | None = None,
     failing_field: str = "",
 ) -> dict:
+    """
+    Search a GitHub repo for the file and function that calls a failing endpoint.
+
+    Args:
+        repo_url: Full GitHub URL, e.g. https://github.com/owner/repo
+        endpoint: The failing API endpoint URL from detect step
+        vendor: Vendor name from detect step
+        github_token: User's GitHub OAuth token
+        llm: Optional LLMClient instance
+        failing_field: The specific field that failed (used as fallback keyword)
+
+    Returns:
+        dict with file_path, function_name, match_score
+        or {"status": "not_found", "reason": str}
+    """
     if llm is None:
         llm = LLMClient()
 
@@ -165,7 +202,7 @@ def search(
 
         result = _find_function_in_file(content, hint, llm)
         confidence = result.get("confidence", 0.0)
-        print(f"[search] {candidate['path']} → {result.get('function_name')} ({confidence})")
+        print(f"[search] {candidate['path']} -> {result.get('function_name')} ({confidence})")
 
         if not best or confidence > best.get("match_score", 0.0):
             best = {
