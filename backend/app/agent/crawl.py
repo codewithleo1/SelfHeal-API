@@ -1,3 +1,4 @@
+# backend/app/agent/crawl.py
 import json
 
 import httpx
@@ -44,17 +45,15 @@ def _fetch_spec(vendor: str) -> dict | None:
         return None
 
 
-def _extract_relevant_section(spec: dict, endpoint: str, failing_field: str) -> str:
+def _extract_relevant_section(spec: dict, endpoint: str | None, failing_field: str) -> str:
     """Pull only the relevant endpoint section from a large spec."""
     if not spec:
         return ""
 
-    # Find matching path in spec
     paths = spec.get("paths", {})
     for path, path_data in paths.items():
-        if path in endpoint or endpoint.endswith(path):
+        if endpoint and (path in endpoint or endpoint.endswith(path)):
             section = json.dumps(path_data, indent=2)
-            # Truncate to avoid hitting token limits
             return section[:3000]
 
     # If no exact match, return a summary of available paths
@@ -63,7 +62,7 @@ def _extract_relevant_section(spec: dict, endpoint: str, failing_field: str) -> 
 
 
 def crawl(
-    endpoint: str,
+    endpoint: str | None,
     vendor: str,
     failing_field: str,
     llm: LLMClient | None = None,
@@ -72,7 +71,7 @@ def crawl(
     Fetch vendor API spec and identify what changed.
 
     Args:
-        endpoint: The failing API endpoint URL
+        endpoint: The failing API endpoint URL (may be None)
         vendor: Vendor name (Stripe, Twilio, etc.)
         failing_field: The field that caused the error
 
@@ -89,7 +88,7 @@ def crawl(
         spec_section = f"No spec found for vendor: {vendor}"
 
     user_prompt = f"""
-Endpoint: {endpoint}
+Endpoint: {endpoint or "unknown"}
 Failing field: {failing_field}
 Vendor: {vendor}
 
