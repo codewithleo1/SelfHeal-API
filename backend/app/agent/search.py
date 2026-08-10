@@ -171,11 +171,21 @@ def search(
         for fallback_path in fallback_paths:
             try:
                 content = _fetch_file_content(owner, repo, fallback_path, github_token)
-                result = _find_function_in_file(content, endpoint or keyword, llm)
-                if result.get("function_name"):
+                # File exists — now find the function using failing_field as hint
+                hint = failing_field or endpoint or keyword
+                result = _find_function_in_file(content, hint, llm)
+                function_name = result.get("function_name")
+                # If LLM couldn't identify, grep for failing_field in the file
+                if not function_name and failing_field and failing_field in content:
+                    # Find the function that contains the failing_field
+                    for line in content.split("\n"):
+                        if line.strip().startswith("def ") and failing_field in content[content.find(line):content.find(line)+500]:
+                            function_name = line.strip().split("def ")[1].split("(")[0]
+                            break
+                if function_name:
                     return {
                         "file_path": fallback_path,
-                        "function_name": result.get("function_name"),
+                        "function_name": function_name,
                         "match_score": result.get("confidence", 0.5),
                         "search_query": keyword,
                         "candidates_checked": 0,
