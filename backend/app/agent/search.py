@@ -25,7 +25,7 @@ def _extract_search_keyword(endpoint: str, vendor: str) -> str:
     e.g. "https://api.stripe.com/v1/payment_intents" → "payment_intents"
     """
     # Strip the base URL and use the last meaningful path segment
-    path = endpoint.rstrip("/")
+    path = (endpoint or "").rstrip("/")
     segments = [s for s in path.split("/") if s and not s.startswith("http") and "." not in s]
 
     if segments:
@@ -148,7 +148,7 @@ def search(
         return {"status": "not_found", "reason": f"Cannot parse repo URL: {repo_url}"}
     owner, repo = parts[0], parts[1]
 
-    keyword = _extract_search_keyword(endpoint, vendor)
+    keyword = _extract_search_keyword(endpoint or "", vendor)
 
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)
