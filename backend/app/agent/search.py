@@ -120,30 +120,9 @@ def search(
     llm: LLMClient | None = None,
     failing_field: str = "",
 ) -> dict:
-    """
-    Search a GitHub repo for the file and function that calls a failing endpoint.
-
-    Args:
-        repo_url: Full GitHub URL, e.g. https://github.com/owner/repo
-        endpoint: The failing API endpoint URL from detect step
-        vendor: Vendor name from detect step (used as fallback keyword)
-        github_token: User's GitHub OAuth token
-        llm: Optional LLMClient instance
-
-    Returns:
-        {
-            "file_path": str,
-            "function_name": str,
-            "match_score": float,
-            "search_query": str,
-            "candidates_checked": int,
-        }
-        or {"status": "not_found", "reason": str}
-    """
     if llm is None:
         llm = LLMClient()
 
-    # Parse owner/repo from URL
     parts = repo_url.rstrip("/").replace("https://github.com/", "").split("/")
     if len(parts) < 2:
         return {"status": "not_found", "reason": f"Cannot parse repo URL: {repo_url}"}
@@ -154,65 +133,62 @@ def search(
     else:
         keyword = failing_field or vendor.lower()
 
+    # Try GitHub code search first
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)
     except RuntimeError as e:
-        return {"status": "not_found", "reason": str(e)}
+        candidates = []
+        print(f"[search] GitHub search failed: {e}")
+
+    # If search found nothing, list all repo files and scan them directly
+    if not candidates:
+        print(f"[search] No search results for '{keyword}', scanning repo files directly")
+        try:
+            headers = {
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            }
+            with httpx.Client(timeout=15.0) as client:
+                resp = client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/contents",
+                    headers=headers,
+                )
+            resp.raise_for_status()
+            all_files = [f["path"] for f in resp.json() if f["type"] == "file" and f["path"].endswith(".py")]
+            print(f"[search] Found {len(all_files)} Python files: {all_files}")
+            candidates = [{"path": f, "url": ""} for f in all_files]
+        except Exception as e:  # noqa: BLE001
+            print(f"[search] Failed to list repo contents: {e}")
+            return {"status": "not_found", "reason": f"Could not list repo files: {e}"}
 
     if not candidates:
-        # GitHub search index may not have indexed new files yet.
-        # Fall back: try fetching a file named after the vendor directly.
-        fallback_paths = [
-            f"{vendor.lower()}_client.py",
-            f"{vendor.lower()}.py",
-            f"src/{vendor.lower()}_client.py",
-            f"src/{vendor.lower()}.py",
-        ]
-        for fallback_path in fallback_paths:
-            try:
-                content = _fetch_file_content(owner, repo, fallback_path, github_token)
-                # File exists — now find the function using failing_field as hint
-                hint = failing_field or endpoint or keyword
-                result = _find_function_in_file(content, hint, llm)
-                function_name = result.get("function_name")
-                # If LLM couldn't identify, grep for failing_field in the file
-                if not function_name and failing_field and failing_field in content:
-                    # Find the function that contains the failing_field
-                    for line in content.split("\n"):
-                        if line.strip().startswith("def ") and failing_field in content[content.find(line):content.find(line)+500]:
-                            function_name = line.strip().split("def ")[1].split("(")[0]
-                            break
-                if function_name:
-                    return {
-                        "file_path": fallback_path,
-                        "function_name": function_name,
-                        "match_score": result.get("confidence", 0.5),
-                        "search_query": keyword,
-                        "candidates_checked": 0,
-                    }
-            except Exception as e:  # noqa: BLE001
-                print(f"[search] Fallback path {fallback_path} not found: {e}")
-                continue
-
         return {
             "status": "not_found",
-            "reason": f"No files found containing '{keyword}' in {owner}/{repo}",
+            "reason": f"No Python files found in {owner}/{repo}",
         }
 
-    # Check up to 3 candidates, pick the one with highest LLM confidence
+    # Check up to 5 candidates, pick the one with highest LLM confidence
     best: dict = {}
     checked = 0
+    hint = failing_field or endpoint or keyword
 
-    for candidate in candidates[:3]:
+    for candidate in candidates[:5]:
         checked += 1
         try:
             content = _fetch_file_content(owner, repo, candidate["path"], github_token)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[search] Could not fetch {candidate['path']}: {e}")
             continue
 
-        result = _find_function_in_file(content, endpoint, llm)
+        # Quick grep: skip files that don't mention the failing field at all
+        if failing_field and failing_field not in content:
+            print(f"[search] Skipping {candidate['path']} — does not contain '{failing_field}'")
+            continue
+
+        result = _find_function_in_file(content, hint, llm)
         confidence = result.get("confidence", 0.0)
+        print(f"[search] {candidate['path']} → {result.get('function_name')} ({confidence})")
 
         if not best or confidence > best.get("match_score", 0.0):
             best = {
@@ -223,7 +199,6 @@ def search(
                 "candidates_checked": checked,
             }
 
-        # Good enough — stop early
         if confidence >= 0.85:
             break
 
