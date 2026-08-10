@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.db.client import get_db
 
-router = APIRouter(prefix="/api/v1", tags=["jobs"])
+router = APIRouter(prefix="/api/v1/sync-pr", tags=["jobs"])
 
 
 def _get_pr_status(pr_url: str, github_token: str) -> str:
@@ -47,7 +47,7 @@ def _get_pr_status(pr_url: str, github_token: str) -> str:
     return "open"
 
 
-@router.get("/jobs/{job_id}/sync-pr")
+@router.get("/{job_id}")
 async def sync_pr_status(job_id: str):
     """Check GitHub and update PR status for a completed job."""
     db = get_db()
