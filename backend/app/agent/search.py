@@ -149,7 +149,10 @@ def search(
         return {"status": "not_found", "reason": f"Cannot parse repo URL: {repo_url}"}
     owner, repo = parts[0], parts[1]
 
-    keyword = _extract_search_keyword(endpoint or "", vendor) or failing_field or vendor.lower()
+    if endpoint:
+        keyword = _extract_search_keyword(endpoint, vendor) or failing_field or vendor.lower()
+    else:
+        keyword = failing_field or vendor.lower()
 
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)
