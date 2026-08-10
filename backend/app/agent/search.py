@@ -74,7 +74,7 @@ def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str
     """Fetch raw file content from GitHub."""
     headers = {
         "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.raw+json",
+        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
@@ -84,32 +84,17 @@ def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str
 
     resp.raise_for_status()
 
-    # GitHub returns base64-encoded content by default
     import base64
+    content_type = resp.headers.get("content-type", "")
+
+    # If response is plain text (raw file content)
+    if "application/json" not in content_type:
+        return resp.text
+
     data = resp.json()
     if data.get("encoding") == "base64":
         return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
     return data.get("content", "")
-
-
-def _find_function_in_file(file_content: str, endpoint: str, llm: LLMClient) -> dict:
-    """Ask the LLM which function in the file calls the given endpoint."""
-    prompt = (
-        f"Failing endpoint: {endpoint}\n\n"
-        f"File content:\n```\n{file_content[:6000]}\n```\n\n"
-        "Which function calls this endpoint?"
-    )
-    response = llm.complete(
-        system=FUNCTION_FINDER_PROMPT,
-        user=prompt,
-        max_tokens=300,
-    )
-
-    import json
-    try:
-        return json.loads(response.strip())
-    except json.JSONDecodeError:
-        return {"function_name": None, "confidence": 0.0, "reasoning": "LLM parse error"}
 
 
 def search(
