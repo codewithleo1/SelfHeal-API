@@ -160,6 +160,30 @@ def search(
         return {"status": "not_found", "reason": str(e)}
 
     if not candidates:
+        # GitHub search index may not have indexed new files yet.
+        # Fall back: try fetching a file named after the vendor directly.
+        fallback_paths = [
+            f"{vendor.lower()}_client.py",
+            f"{vendor.lower()}.py",
+            f"src/{vendor.lower()}_client.py",
+            f"src/{vendor.lower()}.py",
+        ]
+        for fallback_path in fallback_paths:
+            try:
+                content = _fetch_file_content(owner, repo, fallback_path, github_token)
+                result = _find_function_in_file(content, endpoint or keyword, llm)
+                if result.get("function_name"):
+                    return {
+                        "file_path": fallback_path,
+                        "function_name": result.get("function_name"),
+                        "match_score": result.get("confidence", 0.5),
+                        "search_query": keyword,
+                        "candidates_checked": 0,
+                    }
+            except Exception as e:  # noqa: BLE001
+                print(f"[search] Fallback path {fallback_path} not found: {e}")
+                continue
+
         return {
             "status": "not_found",
             "reason": f"No files found containing '{keyword}' in {owner}/{repo}",
