@@ -118,6 +118,7 @@ def search(
     vendor: str,
     github_token: str,
     llm: LLMClient | None = None,
+    failing_field: str = "",
 ) -> dict:
     """
     Search a GitHub repo for the file and function that calls a failing endpoint.
@@ -148,7 +149,7 @@ def search(
         return {"status": "not_found", "reason": f"Cannot parse repo URL: {repo_url}"}
     owner, repo = parts[0], parts[1]
 
-    keyword = _extract_search_keyword(endpoint or "", vendor)
+    keyword = _extract_search_keyword(endpoint or "", vendor) or failing_field or vendor.lower()
 
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)

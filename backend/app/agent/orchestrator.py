@@ -89,6 +89,7 @@ def run_agent(
             vendor=detect_result.get("vendor", ""),
             github_token=github_token,
             llm=llm,
+            failing_field=detect_result.get("failing_field", ""),
         )
         if search_result.get("status") == "not_found":
             _log_step(job_id, 2, "search", "error", search_result)
