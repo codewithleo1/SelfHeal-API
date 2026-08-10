@@ -29,9 +29,9 @@ app.add_middleware(
 )
 
 app.include_router(github.router)
+app.include_router(pr_sync.router)
 app.include_router(jobs.router)
 app.include_router(webhooks.router)
-app.include_router(pr_sync.router)
 
 
 @app.on_event("startup")
