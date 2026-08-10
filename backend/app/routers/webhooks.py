@@ -18,7 +18,7 @@ load_dotenv()
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
 SENTRY_WEBHOOK_SECRET = os.getenv("SENTRY_WEBHOOK_SECRET", "")
-AGENT_GITHUB_TOKEN = os.getenv("AGENT_GITHUB_TOKEN", "")
+AGENT_GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 
 def _verify_sentry_signature(body: bytes, sentry_hook_signature: str) -> bool:
@@ -121,12 +121,18 @@ async def sentry_webhook(
     # Extract error log from Sentry payload
     error_log = _extract_error_log(payload)
 
+    # Derive user_id from repo owner (e.g. https://github.com/codewithleo1/repo → codewithleo1)
+    try:
+        repo_owner = repo.replace("https://github.com/", "").split("/")[0]
+    except Exception:  # noqa: BLE001
+        repo_owner = "sentry-webhook"
+
     # Create job in Supabase
     job_id = str(uuid.uuid4())
     db = get_db()
     db.table("jobs").insert({
         "id": job_id,
-        "user_id": "sentry-webhook",
+        "user_id": repo_owner,
         "repo_url": repo,
         "error_log": error_log,
         "status": "queued",
