@@ -174,7 +174,7 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <main className="flex flex-col px-8 py-8 gap-6 max-w-6xl mx-auto w-full">
+      <main className="flex flex-col px-8 py-8 gap-6 w-full">
         {error && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{error}</p>}
 
         <div className="grid grid-cols-4 gap-3">
@@ -184,10 +184,10 @@ export default function Dashboard() {
             { label: 'Success rate', value: `${successRate}%`, sub: `${completedJobs.length} of ${jobs.length} jobs`, color: 'text-emerald-400' },
             { label: 'Time saved', value: timeSaved, sub: 'est. at 30 min/fix', color: 'text-emerald-400' },
           ].map(s => (
-            <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <div className="text-xs text-zinc-600 uppercase tracking-widest mb-2">{s.label}</div>
-              <div className={`text-2xl font-semibold ${s.color}`}>{s.value}</div>
-              <div className="text-xs text-zinc-600 mt-1">{s.sub}</div>
+            <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="text-xs text-zinc-500 uppercase tracking-widest mb-3">{s.label}</div>
+              <div className={`text-4xl font-semibold ${s.color}`}>{s.value}</div>
+              <div className="text-sm text-zinc-600 mt-2">{s.sub}</div>
             </div>
           ))}
         </div>
