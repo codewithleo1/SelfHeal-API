@@ -15,8 +15,6 @@ def _get_pr_status(pr_url: str, github_token: str) -> str:
     Check GitHub PR status.
     Returns: 'open', 'merged', or 'closed'
     """
-    # Extract owner, repo, pr_number from URL
-    # e.g. https://github.com/codewithleo1/selfheal-test-repo/pull/17
     match = re.match(r"https://github\.com/([^/]+)/([^/]+)/pull/(\d+)", pr_url)
     if not match:
         return "unknown"
@@ -52,11 +50,13 @@ async def sync_pr_status(job_id: str):
     """Check GitHub and update PR status for a completed job."""
     db = get_db()
 
-    job = db.table("jobs").select("*").eq("id", job_id).single().execute()
-    if not job.data:
+    # Use maybe_single() — returns None instead of raising when row not found
+    result = db.table("jobs").select("*").eq("id", job_id).maybe_single().execute()
+    if not result or not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    pr_url = job.data.get("pr_url")
+    job = result.data
+    pr_url = job.get("pr_url")
     if not pr_url:
         return {"pr_status": "no_pr", "message": "Job has no PR URL"}
 
@@ -66,7 +66,17 @@ async def sync_pr_status(job_id: str):
 
     pr_status = _get_pr_status(pr_url, github_token)
 
-    db.table("jobs").update({"pr_status": pr_status}).eq("id", job_id).execute()
+    # Wrap DB update — if pr_status column missing, log and continue
+    try:
+        db.table("jobs").update({"pr_status": pr_status}).eq("id", job_id).execute()
+    except Exception as e:
+        print(f"[sync-pr] Failed to update pr_status column: {e}")
+        return {
+            "job_id": job_id,
+            "pr_url": pr_url,
+            "pr_status": pr_status,
+            "warning": "pr_status column missing — run migration",
+        }
 
     return {
         "job_id": job_id,
