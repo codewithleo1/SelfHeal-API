@@ -60,7 +60,7 @@ async def sync_pr_status(job_id: str):
     if not pr_url:
         return {"pr_status": "no_pr", "message": "Job has no PR URL"}
 
-    github_token = os.getenv("GITHUB_TOKEN", "")
+    github_token = os.getenv("GITHUB_TOKEN") or os.getenv("AGENT_GITHUB_TOKEN", "")
     if not github_token:
         raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured")
 
