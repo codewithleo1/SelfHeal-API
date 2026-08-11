@@ -33,7 +33,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function PRBadge({ prStatus, prUrl }: { prStatus: string | null; prUrl: string | null }) {
   if (!prUrl) return <span className="text-gray-600 text-xs">—</span>
-  const label = prStatus || 'open'
+  const label = (!prStatus || prStatus === 'unknown') ? 'open' : prStatus
   const cls = `px-2 py-0.5 rounded text-xs font-mono ${PR_CLASSES[label] || 'bg-gray-800 text-gray-400'}`
   return <a href={prUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className={cls}>{label}</a>
 }
