@@ -8,6 +8,7 @@ from app.agent.patch import patch
 from app.agent.pr import create_pr
 from app.agent.search import search
 from app.db.client import get_db
+from app.notifications.discord import notify_pr_opened
 
 
 def _log_step(job_id: str, step: int, step_name: str, status: str, output: dict) -> None:
@@ -162,12 +163,19 @@ def run_agent(
             return {"status": "failed", "reason": pr_result.get("reason")}
 
         _log_step(job_id, 5, "pr", "done", pr_result)
+        notify_pr_opened(
+            repo_url=repo_url,
+            pr_url=pr_result.get("pr_url", ""),
+            endpoint=detect_result.get("endpoint", ""),
+            diff_summary=crawl_result.get("diff_summary", ""),
+        )
         _update_job(
             job_id,
             "completed",
             pr_url=pr_result.get("pr_url"),
             patch_diff=patch_result.get("patched_function"),
         )
+
         return {
             "status": "completed",
             "pr_url": pr_result.get("pr_url"),
