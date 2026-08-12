@@ -8,13 +8,26 @@
 
 ## Screenshots
 
+
+### Landing Page
 ![Landing Page](./screenshots/01_LoginPage.png)
 
-![Dashboard — stats, jobs table, PR status](./screenshots/02_Dashboard.png)
+---
 
-![Job Result — patched code, PR link](./screenshots/03_Pipeline.png)
+### Dashboard — Stats, Jobs Table, PR Status
+![Dashboard](./screenshots/02_Dashboard.png)
 
-![Discord notification on PR open](./screenshots/04_Discord%20Notification.png)
+---
+
+### Job Result — Patched Code & PR Link
+![Job Result](./screenshots/03_Pipeline.png)
+
+---
+
+### Discord Notification on PR Open
+![Discord Notification](./screenshots/04_Discord%20Notification.png)
+
+---
 
 ---
 
