@@ -2,10 +2,9 @@
 
 import os
 import re
-
-import httpx
 import uuid
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
