@@ -172,7 +172,7 @@ def search(
             all_files = [f["path"] for f in resp.json() if f["type"] == "file" and f["path"].endswith(".py")]
             print(f"[search] Found {len(all_files)} Python files: {all_files}")
             candidates = [{"path": f, "url": ""} for f in all_files]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[search] Failed to list repo contents: {e}")
             return {"status": "not_found", "reason": f"Could not list repo files: {e}"}
 
@@ -191,7 +191,7 @@ def search(
         checked += 1
         try:
             content = _fetch_file_content(owner, repo, candidate["path"], github_token)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[search] Could not fetch {candidate['path']}: {e}")
             continue
 

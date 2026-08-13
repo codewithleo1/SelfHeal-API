@@ -124,7 +124,7 @@ async def sentry_webhook(
     # Derive user_id from repo owner (e.g. https://github.com/codewithleo1/repo → codewithleo1)
     try:
         repo_owner = repo.replace("https://github.com/", "").split("/")[0]
-    except Exception:  # noqa: BLE001
+    except Exception:
         repo_owner = "sentry-webhook"
 
     # Create job in Supabase
