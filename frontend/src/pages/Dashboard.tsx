@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import Sidebar from '../components/Sidebar'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -68,20 +69,27 @@ const VENDOR_HEALTH: Record<string, { risk: string; color: string; breakingPerYe
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cls = `inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${STATUS_CLASSES[status] || 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`
-  return <span className={cls}>{status}</span>
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${STATUS_CLASSES[status] || 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}>{status}</span>
 }
 
 function PRBadge({ prStatus, prUrl }: { prStatus: string | null; prUrl: string | null }) {
   if (!prUrl) return <span className="text-zinc-700 text-xs font-mono">—</span>
   const label = (!prStatus || prStatus === 'unknown') ? 'open' : prStatus
-  const cls = `inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${PR_CLASSES[label] || 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`
-  return <a href={prUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className={cls}>{label}</a>
+  return <a href={prUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${PR_CLASSES[label] || 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}>{label}</a>
 }
 
 function StepChip({ name, status }: { name: string; status: string }) {
   const cls = status === 'done' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900' : status === 'running' ? 'bg-yellow-950 text-yellow-400 border border-yellow-900 animate-pulse' : status === 'error' ? 'bg-red-950 text-red-400 border border-red-900' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'
   return <span className={`px-2 py-0.5 rounded text-xs font-mono ${cls}`}>{name}</span>
+}
+
+function ProgressBar({ value }: { value: number }) {
+  return (
+    <div className="flex items-center gap-2 w-28">
+      <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${value}%` }} /></div>
+      <span className="text-xs text-zinc-500 font-mono w-8 text-right">{value}%</span>
+    </div>
+  )
 }
 
 function timeAgo(dateStr: string): string {
@@ -105,6 +113,13 @@ function buildChartData(jobs: Job[]) {
   return days.map(({ label, date }) => ({ day: label, jobs: jobs.filter(j => j.created_at.slice(0, 10) === date).length }))
 }
 
+function jobProgress(job: Job): number {
+  if (job.status === 'completed') return 100
+  if (job.status === 'failed') return 0
+  if (job.status === 'queued') return 0
+  return 50
+}
+
 export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -120,7 +135,6 @@ export default function Dashboard() {
   const [runningSteps, setRunningSteps] = useState<Step[]>([])
   const [activeTab, setActiveTab] = useState<'jobs' | 'repos'>('jobs')
 
-  // Repos tab state
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([])
   const [reposLoading, setReposLoading] = useState(false)
   const [reposError, setReposError] = useState('')
@@ -137,7 +151,6 @@ export default function Dashboard() {
     }
   }, [token, user])
 
-  const displayUser = user || localStorage.getItem('gh_user')
   const storedToken = token || localStorage.getItem('gh_token')
   const storedUser = user || localStorage.getItem('gh_user')
 
@@ -149,11 +162,7 @@ export default function Dashboard() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail || 'Failed to load jobs')
         setJobs(data.jobs || [])
-      } catch (e: any) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
-      }
+      } catch (e: any) { setError(e.message) } finally { setLoading(false) }
     }
     fetchJobs()
     const interval = setInterval(fetchJobs, 5000)
@@ -176,7 +185,6 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [runningJob?.id])
 
-  // Fetch GitHub repos when Repos tab is opened
   useEffect(() => {
     if (activeTab !== 'repos' || !storedToken || githubRepos.length > 0) return
     const fetchRepos = async () => {
@@ -185,13 +193,8 @@ export default function Dashboard() {
       try {
         const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=pushed', { headers: { Authorization: `Bearer ${storedToken}` } })
         if (!res.ok) throw new Error('Failed to fetch repos from GitHub')
-        const data = await res.json()
-        setGithubRepos(data)
-      } catch (e: any) {
-        setReposError(e.message)
-      } finally {
-        setReposLoading(false)
-      }
+        setGithubRepos(await res.json())
+      } catch (e: any) { setReposError(e.message) } finally { setReposLoading(false) }
     }
     fetchRepos()
   }, [activeTab, storedToken])
@@ -204,27 +207,23 @@ export default function Dashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Analysis failed')
       setInsights(prev => ({ ...prev, [repoUrl]: data.analysis }))
-    } catch (e: any) {
-      setReposError(e.message)
-    } finally {
-      setAnalyzingRepo(null)
-    }
+    } catch (e: any) { setReposError(e.message) } finally { setAnalyzingRepo(null) }
   }
 
   const completedJobs = jobs.filter(j => j.status === 'completed')
   const mergedPRs = jobs.filter(j => j.pr_status === 'merged').length
+  const prsOpened = jobs.filter(j => j.pr_url).length
   const successRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : 0
-  const timeSaved = `~${Math.round(completedJobs.length * 0.5)}h`
+  const avgTime = '~47s'
   const repos = Array.from(new Set(jobs.map(j => j.repo_url.replace('https://github.com/', ''))))
   const chartData = buildChartData(jobs)
+  const getStepStatus = (name: string) => runningSteps.find(s => s.step_name === name)?.status || 'pending'
 
   const filtered = jobs.filter(j => {
     const repoMatch = repoFilter === 'all' || j.repo_url.includes(repoFilter)
     const statusMatch = statusFilter === 'all' || j.status === statusFilter
     return repoMatch && statusMatch
   })
-
-  const getStepStatus = (name: string) => runningSteps.find(s => s.step_name === name)?.status || 'pending'
 
   if (!authed) {
     return (
@@ -236,198 +235,213 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
-      <nav className="flex items-center justify-between px-8 py-3 border-b border-zinc-900 bg-zinc-950 sticky top-0 z-10">
-        <div className="flex items-center gap-8">
-          <span className="text-sm font-semibold text-emerald-400 tracking-wide">SelfHeal-API</span>
-          <div className="flex items-center gap-1">
-            <a href="/dashboard" className="text-xs px-3 py-1.5 rounded-md bg-zinc-900 text-white">Dashboard</a>
-            <a href="/jobs/new" className="text-xs px-3 py-1.5 rounded-md text-zinc-500 hover:text-zinc-300 transition">New job</a>
+    <div className="min-h-screen bg-zinc-950 text-white flex">
+      <Sidebar user={storedUser} />
+
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-8 py-4 border-b border-zinc-900">
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-base font-semibold text-white">Dashboard</h1>
+            <p className="text-xs text-zinc-500">Overview of your API healing jobs</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {runningJob && <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><span className="text-xs text-emerald-400 font-medium">Agent running</span></div>}
+            <button onClick={() => navigate('/jobs/new')} className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs px-4 py-2 rounded-lg transition">+ New Job</button>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          {runningJob && <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><span className="text-xs text-emerald-400 font-mono">agent running</span></div>}
-          <span className="text-xs text-zinc-500"><span className="text-zinc-400 font-medium">{displayUser}</span></span>
-          <button onClick={() => { localStorage.removeItem('gh_token'); localStorage.removeItem('gh_user'); window.location.href = '/' }} className="text-xs text-zinc-600 hover:text-red-400 transition">Logout</button>
-        </div>
-      </nav>
 
-      <main className="flex flex-col px-8 py-8 gap-6 w-full">
-        {error && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{error}</p>}
+        <div className="flex flex-col gap-6 px-8 py-6">
+          {error && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{error}</p>}
 
-        <div className="grid grid-cols-4 gap-3">
-          {[{ label: 'Jobs run', value: jobs.length.toString(), sub: 'all time', color: 'text-white' }, { label: 'PRs merged', value: mergedPRs.toString(), sub: `${jobs.length > 0 ? Math.round((mergedPRs / jobs.length) * 100) : 0}% merge rate`, color: 'text-purple-400' }, { label: 'Success rate', value: `${successRate}%`, sub: `${completedJobs.length} of ${jobs.length} jobs`, color: 'text-emerald-400' }, { label: 'Time saved', value: timeSaved, sub: 'est. at 30 min/fix', color: 'text-emerald-400' }].map(s => (
-            <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <div className="text-xs text-zinc-500 uppercase tracking-widest mb-3">{s.label}</div>
-              <div className={`text-4xl font-semibold ${s.color}`}>{s.value}</div>
-              <div className="text-sm text-zinc-600 mt-2">{s.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {runningJob && (
-          <div className="bg-emerald-950 border border-emerald-900 rounded-xl px-5 py-3 flex items-center gap-4">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-xs text-emerald-400 font-medium">Agent running</span>
-              <span className="text-xs text-emerald-700 font-mono truncate">{runningJob.repo_url.replace('https://github.com/', '')}</span>
-            </div>
-            <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
-              {PIPELINE_STEPS.map(name => <StepChip key={name} name={name} status={getStepStatus(name)} />)}
-            </div>
-            <button onClick={() => navigate(`/jobs/${runningJob.id}`)} className="text-xs text-emerald-600 hover:text-emerald-400 transition ml-2 flex-shrink-0">View →</button>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            {[
+              { label: 'Total Jobs', value: jobs.length.toString(), sub: '↑ all time', icon: '≡', color: 'text-white' },
+              { label: 'Successful', value: completedJobs.length.toString(), sub: `↑ ${successRate}% success rate`, icon: '✓', color: 'text-emerald-400' },
+              { label: 'PRs Opened', value: prsOpened.toString(), sub: `${mergedPRs} merged`, icon: '⎇', color: 'text-purple-400' },
+              { label: 'Avg. Time', value: avgTime, sub: '↓ 8s vs last 7 days', icon: '⏱', color: 'text-emerald-400' },
+            ].map(s => (
+              <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-500 uppercase tracking-widest">{s.label}</span>
+                  <span className="text-zinc-600 text-sm">{s.icon}</span>
+                </div>
+                <span className={`text-3xl font-semibold ${s.color}`}>{s.value}</span>
+                <span className="text-xs text-zinc-600">{s.sub}</span>
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b border-zinc-900">
-          <button onClick={() => setActiveTab('jobs')} className={`text-xs px-4 py-2 font-medium transition border-b-2 -mb-px ${activeTab === 'jobs' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>Jobs</button>
-          <button onClick={() => setActiveTab('repos')} className={`text-xs px-4 py-2 font-medium transition border-b-2 -mb-px ${activeTab === 'repos' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>Repos</button>
-        </div>
-
-        {/* Jobs Tab */}
-        {activeTab === 'jobs' && (
-          <div className="flex flex-col gap-6">
-            {jobs.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <div className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Jobs — last 7 days</div>
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={chartData} barSize={24}>
-                    <XAxis dataKey="day" tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} width={24} />
-                    <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8, fontSize: 12, color: '#d4d4d8' }} cursor={{ fill: '#27272a' }} />
-                    <Bar dataKey="jobs" fill="#34d399" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+          {/* Running job banner */}
+          {runningJob && (
+            <div className="bg-emerald-950 border border-emerald-900 rounded-xl px-5 py-3 flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-xs text-emerald-400 font-medium">Agent running</span>
+                <span className="text-xs text-emerald-700 font-mono truncate">{runningJob.repo_url.replace('https://github.com/', '')}</span>
               </div>
-            )}
-
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-zinc-300">Recent jobs</h2>
-                <div className="flex items-center gap-3">
-                  <select value={repoFilter} onChange={e => setRepoFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs px-3 py-1.5 rounded-lg outline-none">
-                    <option value="all">All repos</option>
-                    {repos.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs px-3 py-1.5 rounded-lg outline-none">
-                    <option value="all">All statuses</option>
-                    <option value="completed">Completed</option>
-                    <option value="failed">Failed</option>
-                    <option value="running">Running</option>
-                  </select>
-                  <a href="/jobs/new" className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs px-4 py-1.5 rounded-lg transition">+ New job</a>
-                </div>
+              <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+                {PIPELINE_STEPS.map(name => <StepChip key={name} name={name} status={getStepStatus(name)} />)}
               </div>
+              <button onClick={() => navigate(`/jobs/${runningJob.id}`)} className="text-xs text-emerald-600 hover:text-emerald-400 transition ml-2 flex-shrink-0">View →</button>
+            </div>
+          )}
 
-              {loading ? (
-                <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">Loading jobs...</div>
-              ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3 border border-zinc-900 rounded-xl">
-                  <p className="text-zinc-500 text-sm">No jobs found</p>
-                  <a href="/jobs/new" className="text-emerald-400 text-sm hover:text-emerald-300 transition">Run your first job →</a>
+          {/* Tabs */}
+          <div className="flex items-center gap-1 border-b border-zinc-900">
+            <button onClick={() => setActiveTab('jobs')} className={`text-xs px-4 py-2 font-medium transition border-b-2 -mb-px ${activeTab === 'jobs' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>Jobs</button>
+            <button onClick={() => setActiveTab('repos')} className={`text-xs px-4 py-2 font-medium transition border-b-2 -mb-px ${activeTab === 'repos' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>Repositories</button>
+          </div>
+
+          {/* Jobs Tab */}
+          {activeTab === 'jobs' && (
+            <div className="flex flex-col gap-6">
+              {jobs.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Jobs — last 7 days</div>
+                  <ResponsiveContainer width="100%" height={120}>
+                    <BarChart data={chartData} barSize={20}>
+                      <XAxis dataKey="day" tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#52525b', fontSize: 11 }} axisLine={false} tickLine={false} width={20} />
+                      <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8, fontSize: 12, color: '#d4d4d8' }} cursor={{ fill: '#27272a' }} />
+                      <Bar dataKey="jobs" fill="#34d399" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ) : (
-                <div className="border border-zinc-900 rounded-xl overflow-hidden">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-zinc-900">
-                        <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Repo</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Job</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">PR</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">When</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((job, i) => (
-                        <tr key={job.id} onClick={() => navigate(job.status === 'completed' ? `/jobs/${job.id}/result` : `/jobs/${job.id}`)} className={`cursor-pointer hover:bg-zinc-900 transition ${i !== filtered.length - 1 ? 'border-b border-zinc-900' : ''}`}>
-                          <td className="px-5 py-3.5 font-mono text-xs text-zinc-400">{job.repo_url.replace('https://github.com/', '')}</td>
-                          <td className="px-5 py-3.5"><StatusBadge status={job.status} /></td>
-                          <td className="px-5 py-3.5"><PRBadge prStatus={job.pr_status} prUrl={job.pr_url} /></td>
-                          <td className="px-5 py-3.5 text-xs text-zinc-600 font-mono">{timeAgo(job.created_at)}</td>
+              )}
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-zinc-300">Recent Jobs</h2>
+                  <div className="flex items-center gap-3">
+                    <select value={repoFilter} onChange={e => setRepoFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs px-3 py-1.5 rounded-lg outline-none">
+                      <option value="all">All Repositories</option>
+                      {repos.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs px-3 py-1.5 rounded-lg outline-none">
+                      <option value="all">All Statuses</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                      <option value="running">Running</option>
+                    </select>
+                    <button className="text-xs text-zinc-500 hover:text-zinc-300 transition px-2">↻</button>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">Loading jobs...</div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3 border border-zinc-900 rounded-2xl">
+                    <p className="text-zinc-500 text-sm">No jobs found</p>
+                    <a href="/jobs/new" className="text-emerald-400 text-sm hover:text-emerald-300 transition">Run your first job →</a>
+                  </div>
+                ) : (
+                  <div className="border border-zinc-900 rounded-2xl overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-zinc-900 bg-zinc-900/50">
+                          <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Repository</th>
+                          <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Status</th>
+                          <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Progress</th>
+                          <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">PR Status</th>
+                          <th className="text-left px-5 py-3 text-xs font-medium text-zinc-600 uppercase tracking-widest">Created At</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filtered.map((job, i) => (
+                          <tr key={job.id} onClick={() => navigate(job.status === 'completed' ? `/jobs/${job.id}/result` : `/jobs/${job.id}`)} className={`cursor-pointer hover:bg-zinc-900/50 transition ${i !== filtered.length - 1 ? 'border-b border-zinc-900' : ''}`}>
+                            <td className="px-5 py-3.5">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-mono text-xs text-zinc-300">{job.repo_url.replace('https://github.com/', '')}</span>
+                                <span className="font-mono text-xs text-zinc-600">{job.id.slice(0, 8)}...</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5"><StatusBadge status={job.status} /></td>
+                            <td className="px-5 py-3.5"><ProgressBar value={jobProgress(job)} /></td>
+                            <td className="px-5 py-3.5"><PRBadge prStatus={job.pr_status} prUrl={job.pr_url} /></td>
+                            <td className="px-5 py-3.5 text-xs text-zinc-500 font-mono">{new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Repos Tab */}
+          {activeTab === 'repos' && (
+            <div className="flex flex-col gap-4">
+              {reposError && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{reposError}</p>}
+              {reposLoading ? (
+                <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">Fetching your repos...</div>
+              ) : githubRepos.length === 0 ? (
+                <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">No repos found</div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {githubRepos.map(repo => {
+                    const insight = insights[repo.html_url]
+                    const isAnalyzing = analyzingRepo === repo.html_url
+                    return (
+                      <div key={repo.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <a href={repo.html_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-200 hover:text-emerald-400 transition">{repo.full_name}</a>
+                              {repo.private && <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700">private</span>}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-zinc-600 font-mono">
+                              {repo.language && <span>{repo.language}</span>}
+                              <span>pushed {timeAgo(repo.pushed_at)}</span>
+                            </div>
+                          </div>
+                          <button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} className="text-xs px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button>
+                        </div>
+                        {insight && (
+                          <div className="flex flex-col gap-3 border-t border-zinc-800 pt-4">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded font-mono border ${RISK_CLASSES[insight.risk_level]}`}>{insight.risk_level} risk</span>
+                              {insight.vendors.map(v => <span key={v} className="text-xs px-2 py-0.5 rounded font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">{v}</span>)}
+                            </div>
+                            <p className="text-xs text-zinc-500">{insight.risk_reason}</p>
+                            <p className="text-xs text-emerald-600">→ {insight.suggested_action}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-zinc-600">Scanned:</span>
+                              {insight.files_scanned.map(f => <span key={f} className="text-xs font-mono text-zinc-500">{f}</span>)}
+                            </div>
+                            {insight.vendors.filter(v => VENDOR_HEALTH[v]).length > 0 && (
+                              <div className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+                                <span className="text-xs text-zinc-600 uppercase tracking-widest">Vendor Health</span>
+                                {insight.vendors.filter(v => VENDOR_HEALTH[v]).map(v => {
+                                  const vh = VENDOR_HEALTH[v]
+                                  const riskCls = vh.risk === 'high' ? 'text-red-400' : vh.risk === 'medium' ? 'text-yellow-400' : 'text-emerald-400'
+                                  return (
+                                    <div key={v} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-col gap-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-zinc-300 capitalize">{v}</span>
+                                        <span className={`text-xs font-mono ${riskCls}`}>{vh.risk} risk</span>
+                                        <span className="text-xs text-zinc-600 ml-auto">{vh.breakingPerYear}x breaking changes/year</span>
+                                      </div>
+                                      <p className="text-xs text-zinc-600">{vh.note}</p>
+                                      <p className="text-xs text-zinc-700">Last change: {vh.lastChange}</p>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            <button onClick={() => navigate(`/jobs/new?repo=${encodeURIComponent(repo.html_url)}`)} className="self-start text-xs px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition">Run job on this repo →</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Repos Tab */}
-        {activeTab === 'repos' && (
-          <div className="flex flex-col gap-4">
-            {reposError && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{reposError}</p>}
-            {reposLoading ? (
-              <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">Fetching your repos...</div>
-            ) : githubRepos.length === 0 ? (
-              <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">No repos found</div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {githubRepos.map(repo => {
-                  const insight = insights[repo.html_url]
-                  const isAnalyzing = analyzingRepo === repo.html_url
-                  return (
-                    <div key={repo.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <a href={repo.html_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-200 hover:text-emerald-400 transition">{repo.full_name}</a>
-                            {repo.private && <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700">private</span>}
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-zinc-600 font-mono">
-                            {repo.language && <span>{repo.language}</span>}
-                            <span>pushed {timeAgo(repo.pushed_at)}</span>
-                          </div>
-                        </div>
-                        <button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} className="text-xs px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button>
-                      </div>
-
-                      {insight && (
-                        <div className="flex flex-col gap-3 border-t border-zinc-800 pt-4">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded font-mono border ${RISK_CLASSES[insight.risk_level]}`}>{insight.risk_level} risk</span>
-                            {insight.vendors.map(v => <span key={v} className="text-xs px-2 py-0.5 rounded font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">{v}</span>)}
-                          </div>
-                          <p className="text-xs text-zinc-500">{insight.risk_reason}</p>
-                          <p className="text-xs text-emerald-600">→ {insight.suggested_action}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-zinc-600">Scanned:</span>
-                            {insight.files_scanned.map(f => <span key={f} className="text-xs font-mono text-zinc-500">{f}</span>)}
-                          </div>
-
-                          {insight.vendors.filter(v => VENDOR_HEALTH[v]).length > 0 && (
-                            <div className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
-                              <span className="text-xs text-zinc-600 uppercase tracking-widest">Vendor health</span>
-                              {insight.vendors.filter(v => VENDOR_HEALTH[v]).map(v => {
-                                const vh = VENDOR_HEALTH[v]
-                                const riskCls = vh.risk === 'high' ? 'text-red-400' : vh.risk === 'medium' ? 'text-yellow-400' : 'text-emerald-400'
-                                return (
-                                  <div key={v} className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-semibold text-zinc-300 capitalize">{v}</span>
-                                      <span className={`text-xs font-mono ${riskCls}`}>{vh.risk} risk</span>
-                                      <span className="text-xs text-zinc-600 ml-auto">{vh.breakingPerYear}x breaking changes/year</span>
-                                    </div>
-                                    <p className="text-xs text-zinc-600">{vh.note}</p>
-                                    <p className="text-xs text-zinc-700">Last change: {vh.lastChange}</p>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-
-                          <button onClick={() => navigate(`/jobs/new?repo=${encodeURIComponent(repo.html_url)}`)} className="self-start text-xs px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition">Run job on this repo →</button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   )

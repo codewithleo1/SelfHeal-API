@@ -1,5 +1,7 @@
+// frontend/src/pages/JobResult.tsx
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import Sidebar from '../components/Sidebar'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -19,11 +21,39 @@ interface Step {
   output: any
 }
 
+function DiffViewer({ code }: { code: string }) {
+  const lines = code.split('\n')
+  return (
+    <div className="rounded-xl overflow-hidden border border-zinc-800 font-mono text-xs">
+      <div className="bg-zinc-900 px-4 py-2 flex items-center justify-between border-b border-zinc-800">
+        <span className="text-zinc-500">Patched code</span>
+        <button onClick={() => navigator.clipboard.writeText(code)} className="text-zinc-600 hover:text-zinc-400 transition text-xs">Copy</button>
+      </div>
+      <div className="bg-zinc-950 overflow-x-auto max-h-80 overflow-y-auto">
+        {lines.map((line, i) => {
+          const isAdded = line.startsWith('+')
+          const isRemoved = line.startsWith('-')
+          const cls = isAdded ? 'bg-emerald-950/50 text-emerald-300' : isRemoved ? 'bg-red-950/50 text-red-300' : 'text-zinc-400'
+          return (
+            <div key={i} className={`flex ${cls}`}>
+              <span className="w-10 text-right px-3 py-0.5 text-zinc-700 select-none flex-shrink-0 border-r border-zinc-900">{i + 1}</span>
+              <span className="px-4 py-0.5 whitespace-pre">{line || ' '}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function JobResult() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [job, setJob] = useState<Job | null>(null)
   const [steps, setSteps] = useState<Step[]>([])
   const [error, setError] = useState('')
+
+  const storedUser = localStorage.getItem('gh_user')
 
   useEffect(() => {
     const loadJob = async () => {
@@ -32,105 +62,106 @@ export default function JobResult() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
         setJob(data.job)
-        setSteps(data.steps)
-      } catch (e: any) {
-        setError(e.message)
-      }
+        setSteps(data.steps || [])
+      } catch (e: any) { setError(e.message) }
     }
     loadJob()
   }, [id])
 
   const detectStep = steps.find(s => s.step_name === 'detect')
   const crawlStep = steps.find(s => s.step_name === 'crawl')
+  const patchStep = steps.find(s => s.step_name === 'patch')
 
-  const prUrl = job ? job.pr_url : null
-  const patchDiff = job ? job.patch_diff : null
+  const prUrl = job?.pr_url
+  const patchDiff = job?.patch_diff || patchStep?.output?.patched_code || null
+
+  const handleDownload = () => {
+    if (!patchDiff) return
+    const blob = new Blob([patchDiff], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `selfheal-patch-${id?.slice(0, 8)}.py`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-800">
-        <a href="/dashboard" className="text-xl font-bold text-green-400">SelfHeal-API</a>
-        <a href="/jobs/new" className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg transition text-sm">
-          New Job
-        </a>
-      </nav>
+    <div className="min-h-screen bg-zinc-950 text-white flex">
+      <Sidebar user={storedUser} />
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-8 py-4 border-b border-zinc-900">
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            <button onClick={() => navigate('/dashboard')} className="hover:text-zinc-300 transition">Dashboard</button>
+            <span>›</span>
+            <span>Jobs</span>
+            <span>›</span>
+            <span className="text-zinc-300 font-mono">{id?.slice(0, 8)}...</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {prUrl && <a href={prUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition">⎇ View PR on GitHub</a>}
+            {patchDiff && <button onClick={handleDownload} className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition">↓ Download Patch</button>}
+          </div>
+        </div>
 
-      <main className="flex flex-col px-8 py-12 gap-8 max-w-3xl mx-auto w-full">
-        {error && <p className="text-red-400">{error}</p>}
+        <div className="flex flex-col gap-6 px-8 py-8 max-w-5xl w-full">
+          {error && <p className="text-red-400 text-sm bg-red-950 border border-red-900 px-4 py-3 rounded-lg">{error}</p>}
 
-        {job && (
-          <div className="flex flex-col gap-8">
-            <div className="text-center">
-              <div className="text-green-400 text-5xl mb-4">✓</div>
-              <h1 className="text-3xl font-bold mb-2">Fix Applied</h1>
-              <p className="text-gray-400">The agent patched your code and opened a GitHub PR</p>
-            </div>
-
-            {prUrl ? <a href={prUrl} target="_blank" rel="noreferrer" className="bg-green-500 hover:bg-green-400 text-black font-bold px-8 py-4 rounded-xl text-lg transition text-center">View Pull Request on GitHub</a> : null}
-
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col gap-2">
-              <h2 className="font-semibold text-gray-300 mb-2">Job Details</h2>
-              <div className="text-sm text-gray-400">
-                <span className="text-gray-500">Repo: </span>{job.repo_url}
+          {job && (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-xl font-semibold text-white">Job Result</h1>
+                {job && <p className="text-xs text-zinc-500 font-mono">{job.repo_url}</p>}
               </div>
-              <div className="text-sm text-gray-400">
-                <span className="text-gray-500">Status: </span>
-                <span className="text-green-400">{job.status}</span>
-              </div>
-              <div className="text-sm text-gray-400">
-                <span className="text-gray-500">Created: </span>
-                {new Date(job.created_at).toLocaleString()}
-              </div>
-            </div>
 
-            {detectStep && detectStep.output && (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <h2 className="font-semibold text-gray-300 mb-4">What broke</h2>
-                <div className="flex flex-col gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-500">Endpoint: </span>
-                    <span className="font-mono text-yellow-400">{detectStep.output.endpoint}</span>
+              <div className="grid grid-cols-3 gap-4">
+                {/* Summary card */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-400 font-medium">Summary</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900 font-mono">Success</span>
                   </div>
-                  <div>
-                    <span className="text-gray-500">Failing field: </span>
-                    <span className="font-mono text-red-400">{detectStep.output.failing_field}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Vendor: </span>
-                    <span>{detectStep.output.vendor}</span>
+                  <p className="text-xs text-zinc-500 leading-relaxed">The API schema change was detected and the code has been successfully patched.</p>
+                  <div className="flex flex-col gap-2 text-xs border-t border-zinc-800 pt-3">
+                    {detectStep?.output?.endpoint && <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Endpoint</span><span className="font-mono text-zinc-400 text-xs">{detectStep.output.endpoint}</span></div>}
+                    {detectStep?.output?.vendor && <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Vendor</span><span className="font-mono text-zinc-400">{detectStep.output.vendor}</span></div>}
+                    {crawlStep?.output?.diff_summary && <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Breaking changes</span><span className="text-zinc-400 leading-relaxed">{crawlStep.output.diff_summary}</span></div>}
+                    {detectStep?.output?.failing_field && <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Failing field</span><span className="font-mono text-red-400">{detectStep.output.failing_field}</span></div>}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {crawlStep && crawlStep.output && crawlStep.output.diff_summary && (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <h2 className="font-semibold text-gray-300 mb-4">What changed in the API</h2>
-                <p className="text-sm text-gray-400">{crawlStep.output.diff_summary}</p>
-                {crawlStep.output.migration_notes && (
-                  <div className="mt-3 p-3 bg-gray-800 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Migration notes</p>
-                    <p className="text-sm text-gray-300">{crawlStep.output.migration_notes}</p>
+                {/* Patched code — spans 2 cols */}
+                <div className="col-span-2 flex flex-col gap-3">
+                  <span className="text-xs text-zinc-400 font-medium">Patched Code</span>
+                  {patchDiff ? <DiffViewer code={patchDiff} /> : <div className="flex items-center justify-center h-40 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-600 text-sm">No patch data available</div>}
+                </div>
+              </div>
+
+              {/* PR description */}
+              {prUrl && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-400 font-medium">PR Description</span>
+                    <button onClick={() => navigator.clipboard.writeText(prUrl)} className="text-xs text-zinc-600 hover:text-zinc-400 transition">Copy link</button>
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="flex flex-col gap-2 text-xs text-zinc-500 font-mono">
+                    <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Branch</span><span className="text-zinc-400">selfheal/fix-{id?.slice(0, 8)}</span></div>
+                    <div className="flex flex-col gap-0.5"><span className="text-zinc-600">PR</span><a href={prUrl} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 transition">{prUrl}</a></div>
+                    {crawlStep?.output?.migration_notes && <div className="flex flex-col gap-0.5"><span className="text-zinc-600">Migration notes</span><span className="text-zinc-400">{crawlStep.output.migration_notes}</span></div>}
+                  </div>
+                </div>
+              )}
 
-            {patchDiff && (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <h2 className="font-semibold text-gray-300 mb-4">Patched Code</h2>
-                <pre className="text-sm text-green-300 font-mono overflow-x-auto whitespace-pre-wrap">
-                  {patchDiff}
-                </pre>
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                {prUrl && <a href={prUrl} target="_blank" rel="noreferrer" className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-6 py-2.5 rounded-xl text-sm transition">View PR on GitHub →</a>}
+                <button onClick={() => navigate('/jobs/new')} className="border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-medium px-6 py-2.5 rounded-xl text-sm transition">Run Another Job</button>
+                <button onClick={() => navigate('/dashboard')} className="text-zinc-600 hover:text-zinc-400 text-sm transition">← Back to Dashboard</button>
               </div>
-            )}
-
-            
-              <a href="/jobs/new" className="border border-gray-700 hover:border-gray-500 text-white font-semibold px-8 py-3 rounded-xl transition text-center">
-              Run Another Job
-            </a>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )
