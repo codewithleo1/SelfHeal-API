@@ -418,7 +418,7 @@ export default function Dashboard() {
                             </div>
                           )}
 
-                          <button onClick={() => navigate('/jobs/new')} className="self-start text-xs px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition">Run job on this repo →</button>
+                          <button onClick={() => navigate(`/jobs/new?repo=${encodeURIComponent(repo.html_url)}`)} className="self-start text-xs px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition">Run job on this repo →</button>
                         </div>
                       )}
                     </div>
