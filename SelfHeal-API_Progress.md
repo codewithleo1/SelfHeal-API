@@ -243,3 +243,62 @@ Total: [x] 100% Complete
 ---
 
 *Last updated: July 2026 | Update this doc every time you complete a phase.*
+
+---
+
+## Phase 5 — Enhanced Dashboard & UI Redesign
+**Completed:** August 2026
+**Goal:** ProductHunt-ready UI with AI repo insights and full redesign
+
+### Tasks
+
+#### 5.1 Repos Tab + AI Insights
+- [x] Built `POST /api/v1/repos/analyze` endpoint — fetches repo files, calls Groq, returns vendor risk assessment
+- [x] Registered `repos.router` in `main.py` before `jobs.router`
+- [x] Tested endpoint locally — correctly detected stripe, shopify, twilio on selfheal-test-repo
+- [x] Dashboard Repos tab — fetches all user GitHub repos client-side via GitHub API
+- [x] Per-repo Analyze button — calls backend, shows insight card inline
+- [x] Vendor health cards — static data for Stripe, Twilio, Shopify, Plaid, SendGrid
+- [x] "Run job on this repo" pre-fills repo URL in NewJob via ?repo= query param
+- [x] 7-day job history bar chart using recharts
+
+#### 5.2 Full UI Redesign
+- [x] Created shared `Sidebar.tsx` component used across all pages
+- [x] New `Landing.tsx` — bold hero, trust badges, vendor logos, 5-step pipeline, CTA, footer
+- [x] New `Dashboard.tsx` — sidebar, stats with trend text, progress bar column, Jobs/Repos tabs
+- [x] New `JobProgress.tsx` — step timeline with icons/descriptions, progress bar, live logs, job details grid
+- [x] New `JobResult.tsx` — diff viewer with red/green lines, download patch button, PR description
+- [x] New `NewJob.tsx` — sidebar, cleaner form, "Use example" button, info cards
+- [x] recharts installed (`npm install recharts`)
+
+#### 5.3 In Progress
+- [ ] UI brightness/font size pass — inline styles for exact color matching
+  - [x] Sidebar.tsx — done (inline styles, brighter colors)
+  - [ ] Dashboard.tsx — pending
+  - [ ] JobProgress.tsx — pending
+  - [ ] JobResult.tsx — pending
+  - [ ] NewJob.tsx — pending
+
+#### 5.4 Pending
+- [ ] Record Loom demo video
+- [ ] ProductHunt launch
+
+---
+
+## Key Decisions Log (additions)
+
+| Date | Decision | Reason |
+|---|---|---|
+| Aug 2026 | Use inline styles for UI polish pass | Tailwind too coarse for pixel-perfect color matching |
+| Aug 2026 | repos.router registered before jobs.router | Avoids FastAPI route conflicts |
+| Aug 2026 | Client-side GitHub repo fetch | No backend needed — gh_token already in localStorage |
+| Aug 2026 | recharts for job chart | Already in project dependencies, zero config |
+
+---
+
+## Gotchas Added This Phase
+
+- `recharts` must be installed separately: `npm install recharts`
+- `repos.router` must be registered BEFORE `jobs.router` in `main.py`
+- For local OAuth testing: set GitHub OAuth callback to `http://localhost:8000/api/v1/github/callback` and `FRONTEND_URL=http://localhost:5173` — revert before deploying
+- Use inline styles (not Tailwind) for exact color matching in UI polish work
