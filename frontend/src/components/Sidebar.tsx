@@ -1,15 +1,13 @@
 // frontend/src/components/Sidebar.tsx
 import { useLocation, useNavigate } from 'react-router-dom'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 interface SidebarProps {
   user?: string | null
 }
 
 const NAV = [
   { label: 'Dashboard', path: '/dashboard', icon: '▦' },
-  { label: 'Jobs', path: '/dashboard', icon: '≡', exact: false },
+  { label: 'Jobs', path: '/dashboard', icon: '≡' },
   { label: 'New Job', path: '/jobs/new', icon: '+' },
   { label: 'Repositories', path: '/dashboard?tab=repos', icon: '⌗' },
   { label: 'Webhooks', path: '#', icon: '⚡' },
@@ -20,7 +18,6 @@ const NAV = [
 export default function Sidebar({ user }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
-
   const initials = user ? user.slice(0, 2).toUpperCase() : 'SC'
 
   const handleLogout = () => {
@@ -35,40 +32,35 @@ export default function Sidebar({ user }: SidebarProps) {
   }
 
   return (
-    <aside className="w-56 min-h-screen bg-zinc-950 border-r border-zinc-900 flex flex-col flex-shrink-0">
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-5 py-5 border-b border-zinc-900">
-        <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
-          <span className="text-black text-xs font-bold">S</span>
+    <aside style={{ width: '200px', minHeight: '100vh', background: '#1e1e1e', borderRight: '0.5px solid #333', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px', borderBottom: '0.5px solid #333' }}>
+        <div style={{ width: '28px', height: '28px', background: '#10b981', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ color: '#000', fontSize: '13px', fontWeight: 700 }}>S</span>
         </div>
-        <span className="text-sm font-semibold text-white">SelfHeal-API</span>
+        <span style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>SelfHeal-API</span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex flex-col gap-0.5 px-3 py-4 flex-1">
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '12px 8px', flex: 1 }}>
         {NAV.map(item => {
           const active = isActive(item.path)
-          const cls = `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition cursor-pointer ${active ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`
-          if (item.external) {
-            return <a key={item.label} href={item.path} target="_blank" rel="noreferrer" className={cls}><span className="text-base w-4 text-center">{item.icon}</span>{item.label}</a>
-          }
-          return <button key={item.label} onClick={() => navigate(item.path)} className={`${cls} w-full text-left`}><span className="text-base w-4 text-center">{item.icon}</span>{item.label}</button>
+          const style = { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', background: active ? '#2d2d2d' : 'transparent', color: active ? '#fff' : '#a1a1aa', fontWeight: active ? 500 : 400, border: 'none', width: '100%', textAlign: 'left' as const, textDecoration: 'none' }
+          if (item.external) return <a key={item.label} href={item.path} target="_blank" rel="noreferrer" style={style}><span style={{ fontSize: '14px', width: '16px', textAlign: 'center' }}>{item.icon}</span>{item.label}</a>
+          return <button key={item.label} onClick={() => navigate(item.path)} style={style}><span style={{ fontSize: '14px', width: '16px', textAlign: 'center' }}>{item.icon}</span>{item.label}</button>
         })}
       </nav>
 
-      {/* User + Logout */}
-      <div className="px-3 py-4 border-t border-zinc-900 flex flex-col gap-2">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-semibold text-zinc-300">{initials}</span>
+      <div style={{ padding: '10px 8px', borderTop: '0.5px solid #333' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px' }}>
+          <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>{initials}</span>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-medium text-zinc-300 truncate">{user || 'User'}</span>
-            <span className="text-xs text-zinc-600 truncate">{user ? `@${user}` : ''}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontSize: '13px', fontWeight: 500, color: '#e4e4e7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user || 'User'}</span>
+            <span style={{ fontSize: '11px', color: '#71717a' }}>@{user}</span>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-600 hover:text-red-400 hover:bg-zinc-900 transition w-full text-left">
-          <span className="text-base w-4 text-center">→</span>Logout
+        <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', color: '#71717a', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+          <span style={{ width: '16px', textAlign: 'center' }}>→</span>Logout
         </button>
       </div>
     </aside>
