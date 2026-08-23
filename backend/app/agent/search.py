@@ -1,6 +1,7 @@
 # backend/app/agent/search.py
 import base64
 import json
+import re
 
 import httpx
 
@@ -22,71 +23,68 @@ If you cannot identify a specific function, return:
 {"function_name": null, "confidence": 0.0, "reasoning": "explain why"}"""
 
 
+def clean_json(raw: str) -> str:
+    """Robustly clean LLM output to extract valid JSON."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                raw = part
+                break
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+    raw = re.sub(r',\s*([}\]])', r'\1', raw)
+    return raw
+
+
 def _extract_search_keyword(endpoint: str, vendor: str) -> str:
-    """
-    Extract the best keyword to search for in source code.
-    e.g. "https://api.stripe.com/v1/payment_intents" → "payment_intents"
-    """
     path = (endpoint or "").rstrip("/")
     segments = [s for s in path.split("/") if s and not s.startswith("http") and "." not in s]
-
     if segments:
         for seg in reversed(segments):
             if not seg.startswith("v") or not seg[1:].isdigit():
                 return seg
-
     return vendor.lower().replace(" ", "_")
 
 
 def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) -> list[dict]:
-    """Search GitHub code for a keyword in the given repo."""
     headers = {
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    params = {
-        "q": f"{keyword} repo:{owner}/{repo}",
-        "per_page": 5,
-    }
-
+    params = {"q": f"{keyword} repo:{owner}/{repo}", "per_page": 5}
     with httpx.Client(timeout=15.0) as client:
-        resp = client.get(
-            "https://api.github.com/search/code",
-            headers=headers,
-            params=params,
-        )
-
+        resp = client.get("https://api.github.com/search/code", headers=headers, params=params)
     if resp.status_code == 403:
         raise RuntimeError("GitHub search rate limit hit — wait 60 seconds and retry")
     if resp.status_code == 422:
         raise RuntimeError(f"GitHub search rejected query '{keyword}': {resp.text}")
     resp.raise_for_status()
-
     items = resp.json().get("items", [])
     return [{"path": item["path"], "url": item["git_url"]} for item in items]
 
 
 def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str) -> str:
-    """Fetch raw file content from GitHub."""
     headers = {
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
-
     with httpx.Client(timeout=15.0) as client:
         resp = client.get(url, headers=headers)
-
     resp.raise_for_status()
-
     content_type = resp.headers.get("content-type", "")
-
-    # If response is plain text (raw file content)
     if "application/json" not in content_type:
         return resp.text
-
     data = resp.json()
     if data.get("encoding") == "base64":
         return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
@@ -94,19 +92,15 @@ def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str
 
 
 def _find_function_in_file(file_content: str, hint: str, llm: LLMClient) -> dict:
-    """Ask the LLM which function in the file calls the given endpoint or uses the failing field."""
     prompt = (
         f"Failing endpoint or field: {hint}\n\n"
         f"File content:\n```\n{file_content[:6000]}\n```\n\n"
         "Which function calls this endpoint or uses this field?"
     )
-    response = llm.complete(
-        system=FUNCTION_FINDER_PROMPT,
-        user=prompt,
-        max_tokens=300,
-    )
+    response = llm.complete(system=FUNCTION_FINDER_PROMPT, user=prompt, max_tokens=300)
     try:
-        return json.loads(response.strip())
+        cleaned = clean_json(response)
+        return json.loads(cleaned)
     except json.JSONDecodeError:
         return {"function_name": None, "confidence": 0.0, "reasoning": "LLM parse error"}
 
@@ -121,14 +115,6 @@ def search(
 ) -> dict:
     """
     Search a GitHub repo for the file and function that calls a failing endpoint.
-
-    Args:
-        repo_url: Full GitHub URL, e.g. https://github.com/owner/repo
-        endpoint: The failing API endpoint URL from detect step
-        vendor: Vendor name from detect step
-        github_token: User's GitHub OAuth token
-        llm: Optional LLMClient instance
-        failing_field: The specific field that failed (used as fallback keyword)
 
     Returns:
         dict with file_path, function_name, match_score
@@ -147,14 +133,12 @@ def search(
     else:
         keyword = failing_field or vendor.lower()
 
-    # Try GitHub code search first
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)
     except RuntimeError as e:
         candidates = []
         print(f"[search] GitHub search failed: {e}")
 
-    # If search found nothing, list all repo files and scan them directly
     if not candidates:
         print(f"[search] No search results for '{keyword}', scanning repo files directly")
         try:
@@ -177,12 +161,8 @@ def search(
             return {"status": "not_found", "reason": f"Could not list repo files: {e}"}
 
     if not candidates:
-        return {
-            "status": "not_found",
-            "reason": f"No Python files found in {owner}/{repo}",
-        }
+        return {"status": "not_found", "reason": f"No Python files found in {owner}/{repo}"}
 
-    # Check up to 5 candidates, pick the one with highest LLM confidence
     best: dict = {}
     checked = 0
     hint = failing_field or endpoint or keyword
@@ -195,7 +175,6 @@ def search(
             print(f"[search] Could not fetch {candidate['path']}: {e}")
             continue
 
-        # Quick grep: skip files that don't mention the failing field at all
         if failing_field and failing_field not in content:
             print(f"[search] Skipping {candidate['path']} — does not contain '{failing_field}'")
             continue

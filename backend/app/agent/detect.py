@@ -1,4 +1,5 @@
 import json
+import re
 
 from app.agent.llm_client import LLMClient
 
@@ -18,6 +19,31 @@ Extract these fields:
 If you cannot determine a field with confidence, set it to null.
 If the log does not contain enough information, return:
 {"status": "insufficient_data", "reason": "explain why"}"""
+
+
+def clean_json(raw: str) -> str:
+    """Robustly clean LLM output to extract valid JSON."""
+    raw = raw.strip()
+    # Strip markdown fences
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                raw = part
+                break
+    # Trim to first { ... last }
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+    # Strip control characters (tabs/newlines inside strings confuse parser)
+    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+    # Remove trailing commas before } or ] (common model mistake)
+    raw = re.sub(r',\s*([}\]])', r'\1', raw)
+    return raw
 
 
 def detect(error_log: str, llm: LLMClient | None = None) -> dict:
@@ -42,10 +68,10 @@ def detect(error_log: str, llm: LLMClient | None = None) -> dict:
     )
 
     try:
-        result = json.loads(response.strip())
+        cleaned = clean_json(response)
+        result = json.loads(cleaned)
         return result
     except json.JSONDecodeError:
-        # LLM returned non-JSON — extract what we can
         return {
             "status": "parse_error",
             "reason": "LLM returned non-JSON response",

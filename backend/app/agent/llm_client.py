@@ -21,7 +21,9 @@ class LLMClient:
             Groq(api_key=key2),
         ]
         self.current = 0
-        self.model = "llama-3.3-70b-versatile"
+        # llama-3.3-70b-versatile is deprecated on Groq as of Aug 2026
+        # openai/gpt-oss-20b = 1000 t/s, free tier, production-ready replacement
+        self.model = "openai/gpt-oss-20b"
 
     def complete(self, system: str, user: str, max_tokens: int = 1000) -> str:
         """Send a prompt, return response text. Rotates key on rate limit."""
@@ -45,7 +47,12 @@ class LLMClient:
                     print(f"[LLMClient] Key {self.current + 1} rate limited, switching...")
                     self.current = (self.current + 1) % len(self.clients)
                     attempts += 1
+                elif "model" in error_str or "404" in str(e):
+                    # Model not found — fallback to gpt-oss-120b
+                    print(f"[LLMClient] Model not found, trying openai/gpt-oss-120b...")
+                    self.model = "openai/gpt-oss-120b"
+                    attempts += 1
                 else:
                     raise
 
-        raise RuntimeError("All Groq API keys are rate limited. Try again later.")
+        raise RuntimeError("All Groq API keys are rate limited or model unavailable. Try again later.")

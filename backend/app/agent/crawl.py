@@ -1,5 +1,6 @@
 # backend/app/agent/crawl.py
 import json
+import re
 
 import httpx
 
@@ -30,12 +31,32 @@ If you cannot determine the change, return:
 {"status": "insufficient_data", "reason": "explain why"}"""
 
 
+def clean_json(raw: str) -> str:
+    """Robustly clean LLM output to extract valid JSON."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                raw = part
+                break
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+    raw = re.sub(r',\s*([}\]])', r'\1', raw)
+    return raw
+
+
 def _fetch_spec(vendor: str) -> dict | None:
     """Fetch OpenAPI spec for a known vendor."""
     url = VENDOR_SPEC_URLS.get(vendor.lower())
     if not url:
         return None
-
     try:
         response = httpx.get(url, timeout=15)
         response.raise_for_status()
@@ -49,14 +70,11 @@ def _extract_relevant_section(spec: dict, endpoint: str | None, failing_field: s
     """Pull only the relevant endpoint section from a large spec."""
     if not spec:
         return ""
-
     paths = spec.get("paths", {})
     for path, path_data in paths.items():
         if endpoint and (path in endpoint or endpoint.endswith(path)):
             section = json.dumps(path_data, indent=2)
             return section[:3000]
-
-    # If no exact match, return a summary of available paths
     available = list(paths.keys())[:20]
     return json.dumps({"available_paths": available}, indent=2)
 
@@ -69,11 +87,6 @@ def crawl(
 ) -> dict:
     """
     Fetch vendor API spec and identify what changed.
-
-    Args:
-        endpoint: The failing API endpoint URL (may be None)
-        vendor: Vendor name (Stripe, Twilio, etc.)
-        failing_field: The field that caused the error
 
     Returns:
         dict with keys: old_schema, new_schema, diff_summary, migration_notes
@@ -103,7 +116,8 @@ Relevant API spec section:
     )
 
     try:
-        return json.loads(response.strip())
+        cleaned = clean_json(response)
+        return json.loads(cleaned)
     except json.JSONDecodeError:
         return {
             "status": "parse_error",
