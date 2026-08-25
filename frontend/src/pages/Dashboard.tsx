@@ -74,6 +74,13 @@ function Sparkline({ color, data }: { color: string; data: number[] }) {
   )
 }
 
+function CopyWebhookButton({ repoUrl }: { repoUrl: string }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${API_URL}/api/v1/webhooks/sentry?repo=${encodeURIComponent(repoUrl)}`
+  const copy = () => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+  return <button onClick={copy} style={{ background: copied ? '#f0fdf4' : '#f5f3ff', color: copied ? '#16a34a' : '#7c3aed', border: copied ? '1px solid #bbf7d0' : '1px solid #ddd6fe', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copied' : '⚡ Copy Webhook'}</button>
+}
+
 function WebhookBanner() {
   const [copied, setCopied] = useState(false)
   const webhookUrl = `${API_URL}/api/v1/webhooks/sentry?repo=YOUR_GITHUB_REPO_URL`
@@ -492,7 +499,7 @@ export default function Dashboard() {
                           </div>
                           <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{repo.language && `${repo.language} · `}pushed {timeAgo(repo.pushed_at)}</div>
                         </div>
-                        <button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} style={{ background: isAnalyzing ? '#f3f4f6' : 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: isAnalyzing ? '#9ca3af' : '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 600, cursor: isAnalyzing ? 'not-allowed' : 'pointer' }}>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CopyWebhookButton repoUrl={repo.html_url} /><button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} style={{ background: isAnalyzing ? '#f3f4f6' : 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: isAnalyzing ? '#9ca3af' : '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 600, cursor: isAnalyzing ? 'not-allowed' : 'pointer' }}>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button></div>
                       </div>
                       {insight && (
                         <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f5f5f5', display: 'flex', flexDirection: 'column', gap: '10px' }}>
