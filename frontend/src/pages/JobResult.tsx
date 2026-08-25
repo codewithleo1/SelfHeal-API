@@ -1,5 +1,5 @@
 // frontend/src/pages/JobResult.tsx
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 
@@ -73,7 +73,6 @@ export default function JobResult() {
   const prStep     = steps.find(s => s.step_name === 'pr')
   const prUrl      = job?.pr_url
   const patchDiff  = job?.patch_diff || patchStep?.output?.patched_code || null
-  const getStatus  = (name: string) => steps.find(s => s.step_name === name)?.status || 'pending'
   const stepTimes: Record<string, string> = { detect: '8s', search: '10s', crawl: '12s', patch: '12s', pr: '6s' }
 
   const handleDownload = () => {

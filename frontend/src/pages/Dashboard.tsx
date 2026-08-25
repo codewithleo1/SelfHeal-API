@@ -11,13 +11,6 @@ interface Step { step: number; step_name: string; status: string }
 interface GithubRepo { id: number; name: string; full_name: string; html_url: string; language: string | null; pushed_at: string; private: boolean }
 interface RepoInsight { vendors: string[]; risk_level: 'low' | 'medium' | 'high'; risk_reason: string; suggested_action: string; files_scanned: string[] }
 
-const VENDOR_HEALTH: Record<string, { risk: string; breakingPerYear: number; lastChange: string; note: string }> = {
-  stripe: { risk: 'medium', breakingPerYear: 2, lastChange: '3 months ago', note: 'Stripe releases breaking changes ~2x/year. Payment APIs are most affected.' },
-  twilio: { risk: 'low', breakingPerYear: 1, lastChange: '8 months ago', note: 'Twilio is relatively stable. Voice and SMS APIs occasionally deprecate parameters.' },
-  shopify: { risk: 'high', breakingPerYear: 4, lastChange: '2 weeks ago', note: 'Shopify Admin API versions deprecate every 12 months. High churn.' },
-  plaid: { risk: 'medium', breakingPerYear: 2, lastChange: '5 months ago', note: 'Plaid migrated to versioned endpoints. Link token flow changes frequently.' },
-  sendgrid: { risk: 'low', breakingPerYear: 1, lastChange: '1 year ago', note: 'SendGrid v3 API is stable. Occasional template and suppression list changes.' },
-}
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; dot: string }> = {
@@ -111,7 +104,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [repoFilter, setRepoFilter] = useState('all')
-  const [runningSteps, setRunningSteps] = useState<Step[]>([])
+  const [, setRunningSteps] = useState<Step[]>([])
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([])
   const [reposLoading, setReposLoading] = useState(false)
   const [reposError, setReposError] = useState('')
@@ -185,7 +178,6 @@ export default function Dashboard() {
   }
 
   const completedJobs = jobs.filter(j => j.status === 'completed')
-  const mergedPRs = jobs.filter(j => j.pr_status === 'merged').length
   const prsOpened = jobs.filter(j => j.pr_url).length
   const successRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : 0
   const repos = Array.from(new Set(jobs.map(j => j.repo_url.replace('https://github.com/', ''))))
