@@ -1,5 +1,5 @@
 // frontend/src/pages/NewJob.tsx
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 
