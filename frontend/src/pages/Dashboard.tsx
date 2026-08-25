@@ -11,6 +11,13 @@ interface Step { step: number; step_name: string; status: string }
 interface GithubRepo { id: number; name: string; full_name: string; html_url: string; language: string | null; pushed_at: string; private: boolean }
 interface RepoInsight { vendors: string[]; risk_level: 'low' | 'medium' | 'high'; risk_reason: string; suggested_action: string; files_scanned: string[] }
 
+const VENDOR_HEALTH: Record<string, { risk: string; breakingPerYear: number; lastChange: string; note: string }> = {
+  stripe: { risk: 'medium', breakingPerYear: 2, lastChange: '3 months ago', note: 'Stripe releases breaking changes ~2x/year. Payment APIs are most affected.' },
+  twilio: { risk: 'low', breakingPerYear: 1, lastChange: '8 months ago', note: 'Twilio is relatively stable. Voice and SMS APIs occasionally deprecate parameters.' },
+  shopify: { risk: 'high', breakingPerYear: 4, lastChange: '2 weeks ago', note: 'Shopify Admin API versions deprecate every 12 months. High churn.' },
+  plaid: { risk: 'medium', breakingPerYear: 2, lastChange: '5 months ago', note: 'Plaid migrated to versioned endpoints. Link token flow changes frequently.' },
+  sendgrid: { risk: 'low', breakingPerYear: 1, lastChange: '1 year ago', note: 'SendGrid v3 API is stable. Occasional template and suppression list changes.' },
+}
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; dot: string }> = {
@@ -74,6 +81,25 @@ function Sparkline({ color, data }: { color: string; data: number[] }) {
   )
 }
 
+function WebhookBanner() {
+  const [copied, setCopied] = useState(false)
+  const webhookUrl = `${API_URL}/api/v1/webhooks/sentry?repo=YOUR_GITHUB_REPO_URL`
+  const copy = () => { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', border: '1px solid #ddd6fe', borderRadius: '14px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 4px rgba(124,58,237,0.08)' }}>
+      <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#4c1d95', marginBottom: '4px' }}>Auto-trigger via Sentry Webhook</div>
+        <div style={{ fontSize: '11px', color: '#6d28d9', marginBottom: '6px' }}>Connect Sentry to auto-heal errors — no human input required</div>
+        <div style={{ background: '#fff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '7px 12px', fontFamily: 'monospace', fontSize: '12px', color: '#7c3aed', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{webhookUrl}</div>
+      </div>
+      <button onClick={copy} style={{ background: copied ? '#f0fdf4' : '#7c3aed', color: copied ? '#16a34a' : '#fff', border: copied ? '1px solid #bbf7d0' : 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.2s' }}>{copied ? '✓ Copied!' : 'Copy URL'}</button>
+    </div>
+  )
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000); const hours = Math.floor(mins / 60); const days = Math.floor(hours / 24)
@@ -104,7 +130,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [repoFilter, setRepoFilter] = useState('all')
-  const [, setRunningSteps] = useState<Step[]>([])
+  const [runningSteps, setRunningSteps] = useState<Step[]>([])
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([])
   const [reposLoading, setReposLoading] = useState(false)
   const [reposError, setReposError] = useState('')
@@ -178,6 +204,7 @@ export default function Dashboard() {
   }
 
   const completedJobs = jobs.filter(j => j.status === 'completed')
+  const mergedPRs = jobs.filter(j => j.pr_status === 'merged').length
   const prsOpened = jobs.filter(j => j.pr_url).length
   const successRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : 0
   const repos = Array.from(new Set(jobs.map(j => j.repo_url.replace('https://github.com/', ''))))
@@ -275,6 +302,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* WEBHOOK BANNER */}
+          <WebhookBanner />
 
           {/* TAB SWITCHER */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', borderBottom: '2px solid #f0f0f0', paddingBottom: '0' }}>
