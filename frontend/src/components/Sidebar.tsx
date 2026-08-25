@@ -1,5 +1,5 @@
 // frontend/src/components/Sidebar.tsx
-import React from 'react'
+
 import { useLocation, useNavigate } from 'react-router-dom'
 
 interface SidebarProps { user?: string | null }
