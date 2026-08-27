@@ -302,3 +302,36 @@ Total: [x] 100% Complete
 - `repos.router` must be registered BEFORE `jobs.router` in `main.py`
 - For local OAuth testing: set GitHub OAuth callback to `http://localhost:8000/api/v1/github/callback` and `FRONTEND_URL=http://localhost:5173` — revert before deploying
 - Use inline styles (not Tailwind) for exact color matching in UI polish work
+---
+
+## Phase 6 — Demo Mode & ProductHunt Launch
+**Started:** August 2026
+**Goal:** Let anyone preview the product without logging in
+
+### Tasks
+
+#### 6.1 UI Polish (Completed)
+- [x] Light theme Dashboard — stat cards with sparklines, color-coded dots, progress bars
+- [x] Donut chart, line chart, top repos, activity feed on Dashboard
+- [x] Sentry webhook URL banner with Copy URL button
+- [x] Per-repo Copy Webhook button in Repositories tab
+- [x] All pages deployed live on Vercel — build errors fixed
+
+#### 6.2 Demo Mode (In Progress)
+- [x] Created `frontend/src/data/demoData.ts` — 5 fake jobs, 5 repos, 3 insights, 1 full result
+- [ ] Landing.tsx — add "View Live Demo" button
+- [ ] Dashboard.tsx — detect demo=true, load demoData, show demo banner
+- [ ] JobResult.tsx — detect demo job IDs, show DEMO_RESULT
+
+#### 6.3 Launch Prep (Pending)
+- [ ] Update README screenshots (old UI in screenshots folder)
+- [ ] Record Loom demo video
+- [ ] ProductHunt submission
+- [ ] LinkedIn post
+- [ ] Reddit r/SideProject, r/Python
+- [ ] Hacker News Show HN
+
+## Gotchas Added This Phase
+- Vercel build fails on unused TypeScript vars — always run npx tsc --noEmit before pushing
+- Template literals inside JSX style props break OXC parser — use plain string ternaries
+- repos.router must be registered BEFORE jobs.router in main.py
