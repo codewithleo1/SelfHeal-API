@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import Sidebar from '../components/Sidebar'
+import { DEMO_JOBS, DEMO_REPOS, DEMO_INSIGHTS, DEMO_STATS } from '../data/demoData'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -50,7 +51,7 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <div style={{ width: '90px', height: '6px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: '999px', transition: 'width 0.4s' }} />
+        <div style={{ height: '100%', width: value + '%', background: color, borderRadius: '999px', transition: 'width 0.4s' }} />
       </div>
       <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, minWidth: '32px' }}>{value}%</span>
     </div>
@@ -59,16 +60,17 @@ function ProgressBar({ value }: { value: number }) {
 
 function Sparkline({ color, data }: { color: string; data: number[] }) {
   const pts = data.map((v, i) => ({ x: i, y: v }))
+  const gradId = 'sg-' + color.replace('#', '')
   return (
     <ResponsiveContainer width="100%" height={48}>
       <AreaChart data={pts} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <Area type="monotone" dataKey="y" stroke={color} strokeWidth={2} fill={`url(#sg-${color.replace('#','')})`} dot={false} />
+        <Area type="monotone" dataKey="y" stroke={color} strokeWidth={2} fill={'url(#' + gradId + ')'} dot={false} />
       </AreaChart>
     </ResponsiveContainer>
   )
@@ -76,14 +78,14 @@ function Sparkline({ color, data }: { color: string; data: number[] }) {
 
 function CopyWebhookButton({ repoUrl }: { repoUrl: string }) {
   const [copied, setCopied] = useState(false)
-  const url = `${API_URL}/api/v1/webhooks/sentry?repo=${encodeURIComponent(repoUrl)}`
+  const url = API_URL + '/api/v1/webhooks/sentry?repo=' + encodeURIComponent(repoUrl)
   const copy = () => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }
   return <button onClick={copy} style={{ background: copied ? '#f0fdf4' : '#f5f3ff', color: copied ? '#16a34a' : '#7c3aed', border: copied ? '1px solid #bbf7d0' : '1px solid #ddd6fe', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copied' : '⚡ Copy Webhook'}</button>
 }
 
 function WebhookBanner() {
   const [copied, setCopied] = useState(false)
-  const webhookUrl = `${API_URL}/api/v1/webhooks/sentry?repo=YOUR_GITHUB_REPO_URL`
+  const webhookUrl = API_URL + '/api/v1/webhooks/sentry?repo=YOUR_GITHUB_REPO_URL'
   const copy = () => { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }
   return (
     <div style={{ background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', border: '1px solid #ddd6fe', borderRadius: '14px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 4px rgba(124,58,237,0.08)' }}>
@@ -100,10 +102,30 @@ function WebhookBanner() {
   )
 }
 
+// Demo mode banner shown at top of dashboard
+function DemoBanner() {
+  const navigate = useNavigate()
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fcd34d', borderRadius: '0', padding: '12px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '16px' }}>⚡</span>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>Demo Mode</span>
+        <span style={{ fontSize: '13px', color: '#78350f' }}>— This is a preview with sample data. Sign in with GitHub to heal your own APIs.</span>
+      </div>
+      <button
+        onClick={() => navigate('/')}
+        style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+      >
+        Sign In →
+      </button>
+    </div>
+  )
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000); const hours = Math.floor(mins / 60); const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`; if (hours > 0) return `${hours}h ago`; if (mins > 0) return `${mins}m ago`; return 'just now'
+  if (days > 0) return days + 'd ago'; if (hours > 0) return hours + 'h ago'; if (mins > 0) return mins + 'm ago'; return 'just now'
 }
 
 function buildChartData(jobs: Job[]) {
@@ -124,6 +146,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const user = searchParams.get('user')
   const token = searchParams.get('token')
+  const isDemo = searchParams.get('demo') === 'true'
 
   const [authed, setAuthed] = useState(false)
   const [jobs, setJobs] = useState<Job[]>([])
@@ -138,21 +161,35 @@ export default function Dashboard() {
   const [insights, setInsights] = useState<Record<string, RepoInsight>>({})
   const rawTab = searchParams.get('tab')
   const activeTab: 'jobs' | 'repos' = rawTab === 'repos' ? 'repos' : 'jobs'
-  const setActiveTab = (tab: 'jobs' | 'repos') => navigate(`/dashboard?tab=${tab}`, { replace: true })
+  const setActiveTab = (tab: 'jobs' | 'repos') => {
+    if (isDemo) {
+      navigate('/dashboard?demo=true&tab=' + tab, { replace: true })
+    } else {
+      navigate('/dashboard?tab=' + tab, { replace: true })
+    }
+  }
 
+  // Auth effect — skip entirely in demo mode
   useEffect(() => {
+    if (isDemo) { setAuthed(true); return }
     if (token) { localStorage.setItem('gh_token', token); localStorage.setItem('gh_user', user || ''); setAuthed(true) }
     else if (localStorage.getItem('gh_token')) setAuthed(true)
-  }, [token, user])
+  }, [token, user, isDemo])
 
   const storedToken = token || localStorage.getItem('gh_token')
-  const storedUser = user || localStorage.getItem('gh_user')
+  const storedUser = isDemo ? 'Demo User' : (user || localStorage.getItem('gh_user'))
 
+  // Jobs fetch — use demo data if isDemo
   useEffect(() => {
+    if (isDemo) {
+      setJobs(DEMO_JOBS as Job[])
+      setLoading(false)
+      return
+    }
     if (!authed || !storedToken) return
     const fetchJobs = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/jobs`, { headers: { Authorization: `Bearer ${storedToken}:${storedUser}` } })
+        const res = await fetch(API_URL + '/api/v1/jobs', { headers: { Authorization: 'Bearer ' + storedToken + ':' + storedUser } })
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail || 'Failed to load jobs')
         setJobs(data.jobs || [])
@@ -161,15 +198,15 @@ export default function Dashboard() {
     fetchJobs()
     const interval = setInterval(fetchJobs, 5000)
     return () => clearInterval(interval)
-  }, [authed, storedToken, storedUser])
+  }, [authed, storedToken, storedUser, isDemo])
 
-  const runningJob = jobs.find(j => j.status === 'running' || j.status === 'queued')
-
+  // Running job step poll — skip in demo mode
+  const runningJob = isDemo ? undefined : jobs.find(j => j.status === 'running' || j.status === 'queued')
   useEffect(() => {
-    if (!runningJob) { setRunningSteps([]); return }
+    if (isDemo || !runningJob) { setRunningSteps([]); return }
     const pollSteps = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/jobs/${runningJob.id}`)
+        const res = await fetch(API_URL + '/api/v1/jobs/' + runningJob.id)
         const data = await res.json()
         if (res.ok) setRunningSteps(data.steps || [])
       } catch {}
@@ -177,67 +214,90 @@ export default function Dashboard() {
     pollSteps()
     const iv = setInterval(pollSteps, 2000)
     return () => clearInterval(iv)
-  }, [runningJob?.id])
+  }, [runningJob?.id, isDemo])
 
+  // Repos fetch — use demo data if isDemo
   useEffect(() => {
-    if (activeTab !== 'repos' || !storedToken || githubRepos.length > 0) return
+    if (activeTab !== 'repos') return
+    if (isDemo) {
+      setGithubRepos(DEMO_REPOS as GithubRepo[])
+      setInsights(DEMO_INSIGHTS as Record<string, RepoInsight>)
+      return
+    }
+    if (!storedToken || githubRepos.length > 0) return
     const fetchRepos = async () => {
       setReposLoading(true)
       try {
-        const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=pushed', { headers: { Authorization: `Bearer ${storedToken}` } })
+        const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=pushed', { headers: { Authorization: 'Bearer ' + storedToken } })
         if (!res.ok) throw new Error('Failed to fetch repos')
         setGithubRepos(await res.json())
       } catch (e: any) { setReposError(e.message) } finally { setReposLoading(false) }
     }
     fetchRepos()
-  }, [activeTab, storedToken])
+  }, [activeTab, storedToken, isDemo])
 
+  // Analyze repo — use demo data if isDemo
   const analyzeRepo = async (repoUrl: string) => {
+    if (isDemo) {
+      const insight = DEMO_INSIGHTS[repoUrl]
+      if (insight) setInsights(prev => ({ ...prev, [repoUrl]: insight as RepoInsight }))
+      return
+    }
     if (!storedToken) return
     setAnalyzingRepo(repoUrl)
     try {
-      const res = await fetch(`${API_URL}/api/v1/repos/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_url: repoUrl, github_token: storedToken }) })
+      const res = await fetch(API_URL + '/api/v1/repos/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_url: repoUrl, github_token: storedToken }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Analysis failed')
       setInsights(prev => ({ ...prev, [repoUrl]: data.analysis }))
     } catch (e: any) { setReposError(e.message) } finally { setAnalyzingRepo(null) }
   }
 
-  const completedJobs = jobs.filter(j => j.status === 'completed')
+  // Stats — use DEMO_STATS when in demo mode
+  const completedJobs = isDemo
+    ? jobs.filter(j => j.status === 'completed')
+    : jobs.filter(j => j.status === 'completed')
+  const totalJobsDisplay = isDemo ? DEMO_STATS.totalJobs : jobs.length
+  const successfulDisplay = isDemo ? DEMO_STATS.successful : completedJobs.length
+  const prsOpenedDisplay = isDemo ? DEMO_STATS.prsOpened : jobs.filter(j => j.pr_url).length
+  const avgTimeDisplay = isDemo ? DEMO_STATS.avgTime : '47s'
+  const reposCountDisplay = isDemo ? DEMO_STATS.repositories : Array.from(new Set(jobs.map(j => j.repo_url))).length
+
   const prsOpened = jobs.filter(j => j.pr_url).length
-  const successRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : 0
+  const successRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : (isDemo ? 75 : 0)
   const repos = Array.from(new Set(jobs.map(j => j.repo_url.replace('https://github.com/', ''))))
   const chartData = buildChartData(jobs)
   const filtered = jobs.filter(j => repoFilter === 'all' || j.repo_url.includes(repoFilter))
 
   // Sparkline mock data (last 7 points)
-  const sparkJobs = chartData.map(d => d.jobs)
-  const sparkSuccess = chartData.map((d, i) => Math.max(0, d.jobs - (i % 3 === 0 ? 1 : 0)))
-  const sparkPRs = chartData.map(d => Math.round(d.jobs * 0.8))
+  const sparkJobs = isDemo ? [3, 5, 2, 7, 4, 6, 4] : chartData.map(d => d.jobs)
+  const sparkSuccess = isDemo ? [2, 4, 2, 6, 3, 5, 3] : chartData.map((d, i) => Math.max(0, d.jobs - (i % 3 === 0 ? 1 : 0)))
+  const sparkPRs = isDemo ? [2, 4, 1, 5, 3, 5, 3] : chartData.map(d => Math.round(d.jobs * 0.8))
   const sparkTime = [52, 48, 51, 45, 47, 43, 47]
   const sparkRepos = [14, 14, 15, 15, 15, 16, 16]
 
   // Donut data
   const donutData = [
-    { name: 'Successful', value: completedJobs.length, color: '#22c55e' },
-    { name: 'In Progress', value: jobs.filter(j => j.status === 'running').length, color: '#f59e0b' },
-    { name: 'Failed', value: jobs.filter(j => j.status === 'failed').length, color: '#ef4444' },
-    { name: 'Queued', value: jobs.filter(j => j.status === 'queued').length, color: '#3b82f6' },
+    { name: 'Successful', value: isDemo ? DEMO_STATS.successful : completedJobs.length, color: '#22c55e' },
+    { name: 'In Progress', value: isDemo ? 2 : jobs.filter(j => j.status === 'running').length, color: '#f59e0b' },
+    { name: 'Failed', value: isDemo ? 4 : jobs.filter(j => j.status === 'failed').length, color: '#ef4444' },
+    { name: 'Queued', value: isDemo ? 0 : jobs.filter(j => j.status === 'queued').length, color: '#3b82f6' },
   ].filter(d => d.value > 0)
 
   // Top repos
   const repoCounts = repos.map(r => ({ name: r.split('/')[1] || r, count: jobs.filter(j => j.repo_url.includes(r)).length, color: ['#7c3aed','#3b82f6','#22c55e','#f59e0b','#ef4444'][repos.indexOf(r) % 5] })).sort((a, b) => b.count - a.count).slice(0, 5)
 
-  // Activity feed (derived from last 5 jobs)
+  // Activity feed
   const activity = jobs.slice(0, 4).map(j => ({
     id: j.id,
-    text: j.pr_status === 'merged' ? `PR was merged` : j.status === 'completed' ? `Job completed successfully` : j.status === 'running' ? `New job started` : `Job ${j.status}`,
+    text: j.pr_status === 'merged' ? 'PR was merged' : j.status === 'completed' ? 'Job completed successfully' : j.status === 'running' ? 'New job started' : 'Job ' + j.status,
     sub: j.repo_url.replace('https://github.com/', ''),
     time: timeAgo(j.created_at),
     color: j.pr_status === 'merged' ? '#7c3aed' : j.status === 'completed' ? '#22c55e' : j.status === 'running' ? '#3b82f6' : '#ef4444',
   }))
 
-  if (!authed) {
+  // Auth wall — skip in demo mode
+  if (!authed && !isDemo) {
     return (
       <div style={{ minHeight: '100vh', background: '#f8f9fb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>You are not logged in</h1>
@@ -250,15 +310,18 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fb', display: 'flex', ...S }}>
-      <Sidebar user={storedUser} />
+      <Sidebar user={isDemo ? null : storedUser} />
 
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
+
+        {/* Demo banner — shown at very top when in demo mode */}
+        {isDemo && <DemoBanner />}
 
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', margin: 0 }}>Welcome back, {storedUser || 'Suraj'}! 👋</h1>
-            <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>Here's what's happening with your API integrations today.</p>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', margin: 0 }}>{isDemo ? 'Dashboard Preview' : ('Welcome back, ' + (storedUser || 'Suraj') + '! 👋')}</h1>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>{isDemo ? 'Sample data — sign in to see your real API integrations.' : "Here's what's happening with your API integrations today."}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Search */}
@@ -271,10 +334,16 @@ export default function Dashboard() {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '16px', height: '16px', background: '#ef4444', borderRadius: '50%', fontSize: '10px', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
             </div>
-            <button onClick={() => navigate('/jobs/new')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', fontWeight: 600, fontSize: '13px', padding: '9px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              New Job
-            </button>
+            {isDemo ? (
+              <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #d97706, #b45309)', color: '#fff', fontWeight: 600, fontSize: '13px', padding: '9px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}>
+                Sign In with GitHub →
+              </button>
+            ) : (
+              <button onClick={() => navigate('/jobs/new')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', fontWeight: 600, fontSize: '13px', padding: '9px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Job
+              </button>
+            )}
           </div>
         </div>
 
@@ -284,11 +353,11 @@ export default function Dashboard() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
             {[
-              { label: 'Total Jobs', value: jobs.length, sub: `↑ 18% vs last 7 days`, subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>, iconBg: '#f5f3ff', spark: sparkJobs, sparkColor: '#7c3aed' },
-              { label: 'Successful', value: completedJobs.length, sub: `↑ ${successRate}% success rate`, subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, iconBg: '#f0fdf4', spark: sparkSuccess, sparkColor: '#22c55e' },
-              { label: 'PRs Opened', value: prsOpened, sub: `↑ 16% vs last 7 days`, subColor: '#3b82f6', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>, iconBg: '#eff6ff', spark: sparkPRs, sparkColor: '#3b82f6' },
-              { label: 'Avg. Time to Heal', value: '47s', sub: `↓ 15% vs last 7 days`, subColor: '#ef4444', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, iconBg: '#fffbeb', spark: sparkTime, sparkColor: '#f59e0b' },
-              { label: 'Repositories', value: repos.length || 16, sub: `↑ 2 new this week`, subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>, iconBg: '#fef2f2', spark: sparkRepos, sparkColor: '#ef4444' },
+              { label: 'Total Jobs', value: totalJobsDisplay, sub: '↑ 18% vs last 7 days', subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>, iconBg: '#f5f3ff', spark: sparkJobs, sparkColor: '#7c3aed' },
+              { label: 'Successful', value: successfulDisplay, sub: '↑ ' + successRate + '% success rate', subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, iconBg: '#f0fdf4', spark: sparkSuccess, sparkColor: '#22c55e' },
+              { label: 'PRs Opened', value: isDemo ? prsOpenedDisplay : prsOpened, sub: '↑ 16% vs last 7 days', subColor: '#3b82f6', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>, iconBg: '#eff6ff', spark: sparkPRs, sparkColor: '#3b82f6' },
+              { label: 'Avg. Time to Heal', value: avgTimeDisplay, sub: '↓ 15% vs last 7 days', subColor: '#ef4444', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, iconBg: '#fffbeb', spark: sparkTime, sparkColor: '#f59e0b' },
+              { label: 'Repositories', value: isDemo ? reposCountDisplay : (repos.length || 16), sub: '↑ 2 new this week', subColor: '#22c55e', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>, iconBg: '#fef2f2', spark: sparkRepos, sparkColor: '#ef4444' },
             ].map(card => (
               <div key={card.label} style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -327,7 +396,7 @@ export default function Dashboard() {
                   <option value="all">All Repositories</option>
                   {repos.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
-                <button onClick={() => navigate('/dashboard')} style={{ fontSize: '13px', color: '#7c3aed', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>View All Jobs →</button>
+                <button onClick={() => navigate(isDemo ? '/dashboard?demo=true' : '/dashboard')} style={{ fontSize: '13px', color: '#7c3aed', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>View All Jobs →</button>
               </div>
             </div>
 
@@ -349,7 +418,13 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {filtered.map((job, i) => (
-                    <tr key={job.id} onClick={() => navigate(job.status === 'completed' ? `/jobs/${job.id}/result` : `/jobs/${job.id}`)} style={{ cursor: 'pointer', borderBottom: i !== filtered.length - 1 ? '1px solid #f9f9f9' : 'none', transition: 'background 0.12s' }} onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <tr
+                      key={job.id}
+                      onClick={() => navigate(job.status === 'completed' ? '/jobs/' + job.id + '/result' : '/jobs/' + job.id)}
+                      style={{ cursor: 'pointer', borderBottom: i !== filtered.length - 1 ? '1px solid #f9f9f9' : 'none', transition: 'background 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
                       <td style={{ padding: '14px 20px', fontSize: '13px', color: '#7c3aed', fontFamily: 'monospace', fontWeight: 500 }}>{job.id.slice(0, 8)}-{job.id.slice(8, 22)}...</td>
                       <td style={{ padding: '14px 20px', fontSize: '13px', color: '#374151', fontWeight: 500 }}>{job.repo_url.replace('https://github.com/', '').split('/')[1] || job.repo_url.replace('https://github.com/', '')}</td>
                       <td style={{ padding: '14px 20px' }}><StatusBadge status={job.status} /></td>
@@ -381,16 +456,16 @@ export default function Dashboard() {
                   </Pie>
                 </PieChart>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-                  <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827' }}>{jobs.length}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827' }}>{isDemo ? DEMO_STATS.totalJobs : jobs.length}</div>
                   <div style={{ fontSize: '11px', color: '#9ca3af' }}>Total</div>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
                 {[
-                  { label: 'Successful', value: completedJobs.length, pct: jobs.length ? Math.round(completedJobs.length/jobs.length*100) : 0, color: '#22c55e' },
-                  { label: 'In Progress', value: jobs.filter(j=>j.status==='running').length, pct: jobs.length ? Math.round(jobs.filter(j=>j.status==='running').length/jobs.length*100) : 0, color: '#f59e0b' },
-                  { label: 'Failed', value: jobs.filter(j=>j.status==='failed').length, pct: jobs.length ? Math.round(jobs.filter(j=>j.status==='failed').length/jobs.length*100) : 0, color: '#ef4444' },
-                  { label: 'Queued', value: jobs.filter(j=>j.status==='queued').length, pct: jobs.length ? Math.round(jobs.filter(j=>j.status==='queued').length/jobs.length*100) : 0, color: '#3b82f6' },
+                  { label: 'Successful', value: isDemo ? DEMO_STATS.successful : completedJobs.length, pct: isDemo ? 75 : (jobs.length ? Math.round(completedJobs.length/jobs.length*100) : 0), color: '#22c55e' },
+                  { label: 'In Progress', value: isDemo ? 2 : jobs.filter(j=>j.status==='running').length, pct: isDemo ? 8 : (jobs.length ? Math.round(jobs.filter(j=>j.status==='running').length/jobs.length*100) : 0), color: '#f59e0b' },
+                  { label: 'Failed', value: isDemo ? 4 : jobs.filter(j=>j.status==='failed').length, pct: isDemo ? 17 : (jobs.length ? Math.round(jobs.filter(j=>j.status==='failed').length/jobs.length*100) : 0), color: '#ef4444' },
+                  { label: 'Queued', value: isDemo ? 0 : jobs.filter(j=>j.status==='queued').length, pct: 0, color: '#3b82f6' },
                 ].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -410,7 +485,10 @@ export default function Dashboard() {
                 <select style={{ fontSize: '11px', color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '3px 8px', outline: 'none' }}><option>Last 7 days</option></select>
               </div>
               <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <LineChart data={isDemo ? [
+                  { day: 'Aug 21', jobs: 3 }, { day: 'Aug 22', jobs: 5 }, { day: 'Aug 23', jobs: 2 },
+                  { day: 'Aug 24', jobs: 7 }, { day: 'Aug 25', jobs: 4 }, { day: 'Aug 26', jobs: 6 }, { day: 'Aug 27', jobs: 4 }
+                ] : chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.15}/>
@@ -428,17 +506,22 @@ export default function Dashboard() {
             {/* Top Repositories */}
             <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827', display: 'block', marginBottom: '16px' }}>Top Repositories</span>
-              {repoCounts.length === 0 ? (
+              {repoCounts.length === 0 && !isDemo ? (
                 <p style={{ fontSize: '13px', color: '#9ca3af' }}>No repos yet</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {repoCounts.map(r => (
+                  {(isDemo ? [
+                    { name: 'selfheal-test-repo', count: 12, color: '#7c3aed' },
+                    { name: 'payment-service',    count: 6,  color: '#3b82f6' },
+                    { name: 'ecommerce-app',      count: 4,  color: '#22c55e' },
+                    { name: 'billing-api',        count: 2,  color: '#f59e0b' },
+                  ] : repoCounts).map(r => (
                     <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>
                       <span style={{ fontSize: '13px', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                         <div style={{ width: '60px', height: '4px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${Math.min(100, (r.count / Math.max(...repoCounts.map(x=>x.count))) * 100)}%`, background: r.color, borderRadius: '999px' }} />
+                          <div style={{ height: '100%', width: Math.min(100, (r.count / 12) * 100) + '%', background: r.color, borderRadius: '999px' }} />
                         </div>
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, minWidth: '20px', textAlign: 'right' }}>{r.count}</span>
                       </div>
@@ -463,7 +546,7 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {activity.map(a => (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: `${a.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: a.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={a.color} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -497,9 +580,12 @@ export default function Dashboard() {
                             <a href={repo.html_url} target="_blank" rel="noreferrer" style={{ fontSize: '14px', fontWeight: 600, color: '#111827', textDecoration: 'none' }}>{repo.full_name}</a>
                             {repo.private && <span style={{ fontSize: '11px', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: '999px' }}>private</span>}
                           </div>
-                          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{repo.language && `${repo.language} · `}pushed {timeAgo(repo.pushed_at)}</div>
+                          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{repo.language && repo.language + ' · '}pushed {timeAgo(repo.pushed_at)}</div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CopyWebhookButton repoUrl={repo.html_url} /><button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} style={{ background: isAnalyzing ? '#f3f4f6' : 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: isAnalyzing ? '#9ca3af' : '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 600, cursor: isAnalyzing ? 'not-allowed' : 'pointer' }}>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CopyWebhookButton repoUrl={repo.html_url} />
+                          <button onClick={() => analyzeRepo(repo.html_url)} disabled={isAnalyzing} style={{ background: isAnalyzing ? '#f3f4f6' : 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: isAnalyzing ? '#9ca3af' : '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 600, cursor: isAnalyzing ? 'not-allowed' : 'pointer' }}>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</button>
+                        </div>
                       </div>
                       {insight && (
                         <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f5f5f5', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -508,7 +594,7 @@ export default function Dashboard() {
                             {insight.vendors.map(v => <span key={v} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: '#f5f3ff', color: '#7c3aed', fontWeight: 500 }}>{v}</span>)}
                           </div>
                           <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>{insight.risk_reason}</p>
-                          <button onClick={() => navigate(`/jobs/new?repo=${encodeURIComponent(repo.html_url)}`)} style={{ alignSelf: 'flex-start', fontSize: '12px', padding: '6px 16px', borderRadius: '8px', background: '#f5f3ff', color: '#7c3aed', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Run job on this repo →</button>
+                          <button onClick={() => navigate('/jobs/new?repo=' + encodeURIComponent(repo.html_url))} style={{ alignSelf: 'flex-start', fontSize: '12px', padding: '6px 16px', borderRadius: '8px', background: '#f5f3ff', color: '#7c3aed', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Run job on this repo →</button>
                         </div>
                       )}
                     </div>

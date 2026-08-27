@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
+import { DEMO_RESULT } from '../data/demoData'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -55,17 +56,34 @@ export default function JobResult() {
   const [error, setError] = useState('')
   const storedUser = localStorage.getItem('gh_user')
 
+  // Demo mode: any job ID that starts with "demo-" loads from DEMO_RESULT
+  const isDemo = id?.startsWith('demo-') ?? false
+
   useEffect(() => {
+    if (isDemo) {
+      // Populate state directly from DEMO_RESULT — no API call
+      setJob({
+        id: DEMO_RESULT.jobId,
+        status: 'completed',
+        repo_url: DEMO_RESULT.repoUrl,
+        pr_url: DEMO_RESULT.prUrl,
+        patch_diff: DEMO_RESULT.patchedCode,
+        created_at: new Date(Date.now() - 1000 * 60 * 47).toISOString(),
+      })
+      setSteps(DEMO_RESULT.steps as Step[])
+      return
+    }
+    // Normal mode — fetch from API
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/jobs/${id}`)
+        const res = await fetch(API_URL + '/api/v1/jobs/' + id)
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
         setJob(data.job); setSteps(data.steps || [])
       } catch (e: any) { setError(e.message) }
     }
     load()
-  }, [id])
+  }, [id, isDemo])
 
   const detectStep = steps.find(s => s.step_name === 'detect')
   const crawlStep  = steps.find(s => s.step_name === 'crawl')
@@ -73,24 +91,47 @@ export default function JobResult() {
   const prStep     = steps.find(s => s.step_name === 'pr')
   const prUrl      = job?.pr_url
   const patchDiff  = job?.patch_diff || patchStep?.output?.patched_code || null
-  const stepTimes: Record<string, string> = { detect: '8s', search: '10s', crawl: '12s', patch: '12s', pr: '6s' }
+  const stepTimes: Record<string, string> = {
+    detect: isDemo ? DEMO_RESULT.steps[0].duration : '8s',
+    search: isDemo ? DEMO_RESULT.steps[1].duration : '10s',
+    crawl:  isDemo ? DEMO_RESULT.steps[2].duration : '12s',
+    patch:  isDemo ? DEMO_RESULT.steps[3].duration : '12s',
+    pr:     isDemo ? DEMO_RESULT.steps[4].duration : '6s',
+  }
 
   const handleDownload = () => {
     if (!patchDiff) return
     const blob = new Blob([patchDiff], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `selfheal-patch-${id?.slice(0,8)}.py`; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'selfheal-patch-' + (id?.slice(0,8) || 'demo') + '.py'; a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fb', display: 'flex', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <Sidebar user={storedUser} />
+      <Sidebar user={isDemo ? null : storedUser} />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+
+        {/* Demo banner */}
+        {isDemo && (
+          <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fcd34d', borderRadius: '0', padding: '12px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '16px' }}>⚡</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>Demo Mode</span>
+              <span style={{ fontSize: '13px', color: '#78350f' }}>— This is a sample result from a real autonomous job. Sign in to heal your own APIs.</span>
+            </div>
+            <button
+              onClick={() => navigate('/')}
+              style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              Sign In →
+            </button>
+          </div>
+        )}
 
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 32px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
-          <button onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, padding: 0 }}>
+          <button onClick={() => navigate(isDemo ? '/dashboard?demo=true' : '/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, padding: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
             Back to Jobs
           </button>
@@ -122,16 +163,21 @@ export default function JobResult() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               Success
             </span>
+            {isDemo && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fffbeb', color: '#d97706', fontSize: '12px', fontWeight: 600, padding: '4px 12px', borderRadius: '999px', border: '1px solid #fcd34d' }}>
+                Sample Data
+              </span>
+            )}
           </div>
           <p style={{ margin: '-16px 0 0', fontSize: '13px', color: '#6b7280' }}>The API schema drift was detected and the code has been successfully patched.</p>
 
           {/* Metadata bar */}
           <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: '14px', padding: '20px 28px', display: 'flex', alignItems: 'center', gap: '0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
             {[
-              { label: 'Job ID', value: `${id?.slice(0,8)}-${id?.slice(8,18)}...`, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>, iconBg: '#f5f3ff', sub: null, copyable: true },
+              { label: 'Job ID', value: (id?.slice(0,8) || 'demo') + '-' + (id?.slice(8,18) || '') + '...', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>, iconBg: '#f5f3ff', sub: null },
               { label: 'Repository', value: job?.repo_url.replace('https://github.com/','').split('/')[1] || 'selfheal-test-repo', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/></svg>, iconBg: '#f9fafb', sub: 'main', link: job?.repo_url },
-              { label: 'PR Status', value: 'Merged', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>, iconBg: '#f5f3ff', sub: job ? new Date(job.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : null, valueColor: '#7c3aed' },
-              { label: 'Total Time', value: '48s', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, iconBg: '#f0fdf4', sub: 'End-to-end' },
+              { label: 'PR Status', value: isDemo ? 'Merged' : (job?.pr_url ? 'Merged' : 'No PR'), icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>, iconBg: '#f5f3ff', sub: job ? new Date(job.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : null, valueColor: '#7c3aed' },
+              { label: 'Total Time', value: isDemo ? DEMO_RESULT.totalTime : '48s', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, iconBg: '#f0fdf4', sub: 'End-to-end' },
               { label: 'Model Used', value: 'Llama 3.3 70B', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72"/></svg>, iconBg: '#eff6ff', sub: 'via Groq', subColor: '#2563eb' },
             ].map((item, idx) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '150px', padding: '0 20px', borderLeft: idx > 0 ? '1px solid #f0f0f0' : 'none' }}>
@@ -179,24 +225,25 @@ export default function JobResult() {
             </div>
           </div>
 
-          {/* Main content: Summary | Patched Code | PR Details */}
-          <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 280px', gap: '16px', alignItems: 'start' }}>
+          {/* Main 3-column grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 260px', gap: '16px', alignItems: 'flex-start' }}>
 
             {/* LEFT: Summary + Impact */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
               {/* Summary */}
               <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Summary</span>
                 </div>
                 <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6, margin: '0 0 12px' }}>
-                  {crawlStep?.output?.diff_summary || `Stripe API changed the field name from `}
-                  {!crawlStep?.output?.diff_summary && <><strong>amount</strong> to <strong>amount_total</strong> in PaymentIntent object.</>}
+                  {isDemo
+                    ? DEMO_RESULT.summary
+                    : (crawlStep?.output?.diff_summary || 'Stripe API changed the field name from amount to amount_total in PaymentIntent object.')}
                 </p>
-                <p style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.5, margin: '0 0 12px' }}>The code has been updated to use the new field name and the PR has been merged.</p>
                 {/* Breaking change box */}
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -204,7 +251,9 @@ export default function JobResult() {
                     <span style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626' }}>Breaking Change</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#374151', margin: 0, lineHeight: 1.5 }}>
-                    {detectStep?.output?.failing_field ? `Field '${detectStep.output.failing_field}' renamed in ${detectStep.output.vendor || 'API'} object.` : "Field 'amount' renamed to 'amount_total' in PaymentIntent object."}
+                    {isDemo
+                      ? DEMO_RESULT.breakingChange
+                      : (detectStep?.output?.failing_field ? "Field '" + detectStep.output.failing_field + "' renamed in " + (detectStep.output.vendor || 'API') + " object." : "Field 'amount' renamed to 'amount_total' in PaymentIntent object.")}
                   </p>
                 </div>
               </div>
@@ -218,10 +267,10 @@ export default function JobResult() {
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Impact</span>
                 </div>
                 {[
-                  { label: 'Severity', value: 'High', bg: '#fef2f2', color: '#dc2626' },
-                  { label: 'Affects Endpoint', value: detectStep?.output?.endpoint || 'POST /v1/payment_intents', bg: '#eff6ff', color: '#2563eb' },
-                  { label: 'Vendor', value: detectStep?.output?.vendor || 'Stripe', bg: '#f5f3ff', color: '#7c3aed' },
-                  { label: 'Error Type', value: detectStep?.output?.error_type || 'Invalid Request Error', bg: null, color: '#374151' },
+                  { label: 'Severity',        value: isDemo ? DEMO_RESULT.severity : 'High',                                                              bg: '#fef2f2', color: '#dc2626' },
+                  { label: 'Affects Endpoint', value: isDemo ? DEMO_RESULT.endpoint : (detectStep?.output?.endpoint || 'POST /v1/payment_intents'),       bg: '#eff6ff', color: '#2563eb' },
+                  { label: 'Vendor',           value: isDemo ? DEMO_RESULT.vendor   : (detectStep?.output?.vendor   || 'Stripe'),                          bg: '#f5f3ff', color: '#7c3aed' },
+                  { label: 'Error Type',       value: detectStep?.output?.error_type || 'Invalid Request Error',                                           bg: null,      color: '#374151' },
                 ].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f9fafb' }}>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>{row.label}</span>
@@ -293,10 +342,10 @@ export default function JobResult() {
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Commit Details</span>
                 </div>
                 {[
-                  { label: 'Commit', value: prStep?.output?.sha?.slice(0,7) || 'd4f3b2e', mono: true, color: '#2563eb' },
-                  { label: 'Branch', value: `selfheal/fix-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-1024`, mono: true, color: '#374151' },
+                  { label: 'Commit',    value: isDemo ? DEMO_RESULT.commit : (prStep?.output?.sha?.slice(0,7) || 'd4f3b2e'), mono: true,  color: '#2563eb' },
+                  { label: 'Branch',    value: isDemo ? DEMO_RESULT.branch : ('selfheal/fix-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-1024'), mono: true,  color: '#374151' },
                   { label: 'Committed', value: job ? new Date(job.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—', mono: false, color: '#374151' },
-                  { label: 'Author', value: 'selfheal-bot 🤖', mono: false, color: '#374151' },
+                  { label: 'Author',    value: 'selfheal-bot', mono: false, color: '#374151' },
                 ].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f9fafb', gap: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#9ca3af', flexShrink: 0 }}>{row.label}</span>
@@ -315,7 +364,7 @@ export default function JobResult() {
                 </div>
                 {[
                   { label: 'Discord', time: job ? new Date(new Date(job.created_at).getTime()+420000).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—' },
-                  { label: 'Sentry', time: job ? new Date(job.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—' },
+                  { label: 'Sentry',  time: job ? new Date(job.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—' },
                 ].map(n => (
                   <div key={n.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f9fafb' }}>
                     <span style={{ fontSize: '12px', color: '#374151', fontWeight: 500 }}>{n.label}</span>
@@ -340,7 +389,9 @@ export default function JobResult() {
                 <span style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>What Happened?</span>
               </div>
               <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.7, margin: 0 }}>
-                {crawlStep?.output?.diff_summary || 'Stripe API updated the PaymentIntent schema. The field amount has been deprecated and replaced with amount_total. SelfHeal-API detected the breaking change, updated your code, and opened a PR with the fix.'}
+                {isDemo
+                  ? DEMO_RESULT.summary
+                  : (crawlStep?.output?.diff_summary || 'Stripe API updated the PaymentIntent schema. The field amount has been deprecated and replaced with amount_total. SelfHeal-API detected the breaking change, updated your code, and opened a PR with the fix.')}
               </p>
             </div>
             {/* Success illustration */}
@@ -357,8 +408,12 @@ export default function JobResult() {
           {/* Action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '24px' }}>
             {prUrl && <a href={prUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontWeight: 600, fontSize: '14px', padding: '11px 24px', borderRadius: '10px', textDecoration: 'none', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>View PR on GitHub →</a>}
-            <button onClick={() => navigate('/jobs/new')} style={{ padding: '11px 24px', borderRadius: '10px', border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>Run Another Job</button>
-            <button onClick={() => navigate('/dashboard')} style={{ color: '#9ca3af', background: 'none', border: 'none', fontSize: '13px', cursor: 'pointer' }}>← Back to Dashboard</button>
+            {isDemo ? (
+              <button onClick={() => navigate('/')} style={{ padding: '11px 24px', borderRadius: '10px', background: 'linear-gradient(135deg,#d97706,#b45309)', color: '#fff', fontWeight: 600, fontSize: '14px', border: 'none', cursor: 'pointer' }}>Sign In to Run Your Own Job →</button>
+            ) : (
+              <button onClick={() => navigate('/jobs/new')} style={{ padding: '11px 24px', borderRadius: '10px', border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>Run Another Job</button>
+            )}
+            <button onClick={() => navigate(isDemo ? '/dashboard?demo=true' : '/dashboard')} style={{ color: '#9ca3af', background: 'none', border: 'none', fontSize: '13px', cursor: 'pointer' }}>← Back to Dashboard</button>
           </div>
         </div>
       </main>

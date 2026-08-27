@@ -1,4 +1,6 @@
 // frontend/src/pages/Landing.tsx
+import { useNavigate } from 'react-router-dom'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const STEPS = [
@@ -20,6 +22,8 @@ const FEATURES = [
 const VENDORS = ['Stripe', 'Twilio', 'Shopify', 'SendGrid', 'Plaid']
 
 export default function Landing() {
+  const navigate = useNavigate()
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
       {/* Nav */}
@@ -44,10 +48,19 @@ export default function Landing() {
         </div>
         <h1 className="text-6xl font-bold leading-tight tracking-tight">Detects API Breaks.<br /><span className="text-zinc-400">Patches Code.</span><br /><span className="text-emerald-400">Opens PRs.</span></h1>
         <p className="text-zinc-400 text-xl max-w-2xl leading-relaxed">SelfHeal-API detects schema drift, patches your client code, and opens a GitHub PR — without human intervention.</p>
-        <div className="flex items-center gap-4">
+
+        {/* CTA buttons — three options */}
+        <div className="flex items-center gap-4 flex-wrap justify-center">
           <a href={`${API_URL}/api/v1/github/login`} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-8 py-3.5 rounded-xl text-base transition">Start Now for Free</a>
-          <a href="https://github.com/codewithleo1/selfheal-test-repo/pull/17" target="_blank" rel="noreferrer" className="border border-zinc-700 hover:border-zinc-500 text-white px-8 py-3.5 rounded-xl text-base transition">View Live Demo →</a>
+          <button
+            onClick={() => navigate('/dashboard?demo=true')}
+            className="border border-zinc-700 hover:border-zinc-500 text-white px-8 py-3.5 rounded-xl text-base transition"
+          >
+            View Live Demo →
+          </button>
+          <a href="https://github.com/codewithleo1/selfheal-test-repo/pull/17" target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-zinc-300 text-sm transition underline underline-offset-4">See a real merged PR</a>
         </div>
+
         {/* Trust badges */}
         <div className="flex items-center gap-8 mt-4 flex-wrap justify-center">
           {[{ icon: '🎁', text: '100% Free Tier' }, { icon: '⚡', text: '< 60 Seconds' }, { icon: '🤖', text: 'Zero Human Input' }, { icon: '🔓', text: 'Open Source' }].map(b => (
@@ -120,7 +133,10 @@ export default function Landing() {
         <div className="max-w-2xl mx-auto text-center flex flex-col gap-6">
           <h2 className="text-3xl font-bold">Stop fixing API breaks manually.</h2>
           <p className="text-zinc-400">Connect your GitHub repo and let SelfHeal-API handle the rest.</p>
-          <a href={`${API_URL}/api/v1/github/login`} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-10 py-4 rounded-xl text-lg transition self-center">Get Started Free →</a>
+          <div className="flex items-center gap-4 justify-center flex-wrap">
+            <a href={`${API_URL}/api/v1/github/login`} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-10 py-4 rounded-xl text-lg transition">Get Started Free →</a>
+            <button onClick={() => navigate('/dashboard?demo=true')} className="border border-zinc-700 hover:border-zinc-500 text-white px-10 py-4 rounded-xl text-lg transition">View Demo</button>
+          </div>
           <p className="text-xs text-zinc-600">No credit card required. 100% free tier.</p>
         </div>
       </section>
