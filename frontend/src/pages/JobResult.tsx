@@ -54,6 +54,7 @@ export default function JobResult() {
   const [job, setJob] = useState<Job | null>(null)
   const [steps, setSteps] = useState<Step[]>([])
   const [error, setError] = useState('')
+  const [fetchedPatch, setFetchedPatch] = useState<string | null>(null)
   const storedUser = localStorage.getItem('gh_user')
 
   // Demo mode: any job ID that starts with "demo-" loads from DEMO_RESULT
@@ -61,7 +62,6 @@ export default function JobResult() {
 
   useEffect(() => {
     if (isDemo) {
-      // Populate state directly from DEMO_RESULT — no API call
       setJob({
         id: DEMO_RESULT.jobId,
         status: 'completed',
@@ -73,13 +73,13 @@ export default function JobResult() {
       setSteps(DEMO_RESULT.steps as Step[])
       return
     }
-    // Normal mode — fetch from API
     const load = async () => {
       try {
         const res = await fetch(API_URL + '/api/v1/jobs/' + id)
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
-        setJob(data.job); setSteps(data.steps || [])
+        setJob(data.job)
+        setSteps(data.steps || [])
       } catch (e: any) { setError(e.message) }
     }
     load()
@@ -90,7 +90,26 @@ export default function JobResult() {
   const patchStep  = steps.find(s => s.step_name === 'patch')
   const prStep     = steps.find(s => s.step_name === 'pr')
   const prUrl      = job?.pr_url
-  const patchDiff  = job?.patch_diff || patchStep?.output?.patched_code || null
+
+  // Fetch patched file from the PR branch — patch_diff is not stored in DB
+  useEffect(() => {
+    if (isDemo || !job || !prStep) return
+    if (job.patch_diff || patchStep?.output?.patched_code) return
+    const branchName = prStep.output?.branch_name
+    if (!branchName) return
+    const match = job.repo_url.match(/github\.com\/([^/]+)\/([^/]+)/)
+    if (!match) return
+    const [, owner, repo] = match
+    const searchStep = steps.find(s => s.step_name === 'search')
+    const filePath   = searchStep?.output?.file_path || 'stripe_client.py'
+    const rawUrl = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branchName + '/' + filePath
+    fetch(rawUrl)
+      .then(r => r.text())
+      .then(text => setFetchedPatch(text))
+      .catch(() => {})
+  }, [job, prStep, steps, isDemo, patchStep])
+
+  const patchDiff = job?.patch_diff || patchStep?.output?.patched_code || fetchedPatch || null
   const stepTimes: Record<string, string> = {
     detect: isDemo ? DEMO_RESULT.steps[0].duration : '8s',
     search: isDemo ? DEMO_RESULT.steps[1].duration : '10s',
