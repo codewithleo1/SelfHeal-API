@@ -53,7 +53,7 @@ export default function Landing() {
         <div className="flex items-center gap-4 flex-wrap justify-center">
           <a href={`${API_URL}/api/v1/github/login`} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-8 py-3.5 rounded-xl text-base transition">Start Now for Free</a>
           <button
-            onClick={() => navigate('/dashboard?demo=true')}
+            onClick={() => navigate('/demo')}
             className="border border-zinc-700 hover:border-zinc-500 text-white px-8 py-3.5 rounded-xl text-base transition"
           >
             View Live Demo →
