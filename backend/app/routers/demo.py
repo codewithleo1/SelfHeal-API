@@ -31,11 +31,10 @@ import httpx
 
 
 def create_payment_intent(amount: int, currency: str) -> dict:
-    """Create a payment intent using Stripe API."""
     response = httpx.post(
         "https://api.stripe.com/v1/payment_intents",
         headers={"Authorization": "Bearer sk_test_placeholder"},
-        json={
+        data={
             "amount": amount * 100,
             "currency": currency,
             "payment_method_types": ["card"],
