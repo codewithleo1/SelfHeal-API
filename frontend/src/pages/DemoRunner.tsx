@@ -116,7 +116,7 @@ export default function DemoRunner() {
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
             </div>
-            <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace', marginLeft: '8px' }}>utils/stripe_client.py</span>
+            <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace', marginLeft: '8px' }}>stripe_client.py</span>
             <span style={{ marginLeft: 'auto', fontSize: '11px', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>BROKEN</span>
           </div>
           <pre style={{ margin: 0, padding: '20px', fontSize: '13px', lineHeight: 1.7, color: '#d1d5db', fontFamily: 'monospace', overflow: 'auto' }}>{`import httpx

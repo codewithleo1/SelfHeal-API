@@ -20,7 +20,7 @@ router = APIRouter()
 # ── constants ────────────────────────────────────────────────────────────────
 AGENT_TOKEN   = os.getenv("GITHUB_TOKEN") or os.getenv("AGENT_GITHUB_TOKEN", "")
 TEST_REPO     = "codewithleo1/selfheal-test-repo"
-BROKEN_FILE   = "utils/stripe_client.py"
+BROKEN_FILE   = "stripe_client.py"
 DEMO_USER_ID  = "demo-visitor"
 RATE_LIMIT_TTL = 600  # 10 minutes in seconds
 
