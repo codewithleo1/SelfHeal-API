@@ -3,18 +3,17 @@
 # Resets the broken file on selfheal-test-repo, then enqueues a real job.
 # Rate-limited: 1 run per IP per 10 minutes via Upstash Redis.
 
+import asyncio
 import base64
-import json
 import os
-import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 
-from app.db.supabase_client import get_supabase
-from app.queue.worker import enqueue_job
+from app.db.client import get_db
+from app.queue.worker import enqueue
 
 router = APIRouter()
 
@@ -124,15 +123,15 @@ async def reset_broken_file() -> None:
 
 # ── create job row in Supabase ───────────────────────────────────────────────
 async def create_demo_job(job_id: str) -> None:
-    supabase = get_supabase()
-    supabase.table("jobs").insert({
+    db = get_db()
+    db.table("jobs").insert({
         "id": job_id,
         "user_id": DEMO_USER_ID,
         "repo_url": f"https://github.com/{TEST_REPO}",
         "error_log": DEMO_ERROR_LOG,
         "status": "queued",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }).execute()
 
 
@@ -160,14 +159,19 @@ async def run_demo(request: Request):
     await reset_broken_file()
 
     # Small pause so GitHub's CDN propagates the reset before the agent reads it
-    time.sleep(1)
+    await asyncio.sleep(1)
 
     # 3. Create job in Supabase
     job_id = str(uuid.uuid4())
     await create_demo_job(job_id)
 
     # 4. Enqueue to Redis worker (same queue the real jobs use)
-    enqueue_job(job_id)
+    enqueue({
+        "job_id": job_id,
+        "error_log": DEMO_ERROR_LOG,
+        "repo_url": f"https://github.com/{TEST_REPO}",
+        "github_token": AGENT_TOKEN,
+    })
 
     # 5. Return
     return {
