@@ -23,7 +23,6 @@ type Phase = 'idle' | 'starting' | 'running' | 'done' | 'error' | 'ratelimit'
 export default function DemoRunner() {
   const navigate = useNavigate()
   const [phase, setPhase]     = useState<Phase>('idle')
-  const [jobId, setJobId]     = useState<string | null>(null)
   const [prUrl, setPrUrl]     = useState<string | null>(null)
   const [errMsg, setErrMsg]   = useState('')
   const [elapsed, setElapsed] = useState(0)
@@ -59,7 +58,6 @@ export default function DemoRunner() {
       }
 
       const id = data.job_id
-      setJobId(id)
       setPhase('running')
 
       // 2. Redirect to the real JobProgress page — it polls every 2s automatically
