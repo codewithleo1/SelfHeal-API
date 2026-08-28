@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.queue.worker import start_worker_thread
 from app.routers import github, jobs, pr_sync, repos, webhooks
+from app.routers import demo
+
 
 load_dotenv()
 
@@ -33,6 +35,8 @@ app.include_router(pr_sync.router)
 app.include_router(repos.router)
 app.include_router(jobs.router)
 app.include_router(webhooks.router)
+app.include_router(demo.router, prefix="/api/v1")
+
 
 
 @app.on_event("startup")
