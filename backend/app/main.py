@@ -5,9 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.queue.worker import start_worker_thread
-from app.routers import github, jobs, pr_sync, repos, webhooks
-from app.routers import demo
-
+from app.routers import demo, github, jobs, pr_sync, repos, webhooks
 
 load_dotenv()
 
@@ -46,4 +44,11 @@ async def startup():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    from app.db.client import get_db
+    try:
+        db = get_db()
+        db.table("jobs").select("id").limit(1).execute()
+        db_status = "ok"
+    except Exception:
+        db_status = "degraded"
+    return {"status": "ok", "version": "1.0.0", "db": db_status}
