@@ -49,7 +49,7 @@ class LLMClient:
                     attempts += 1
                 elif "model" in error_str or "404" in str(e):
                     # Model not found — fallback to gpt-oss-120b
-                    print(f"[LLMClient] Model not found, trying openai/gpt-oss-120b...")
+                    print("[LLMClient] Model not found, trying openai/gpt-oss-120b...")
                     self.model = "openai/gpt-oss-120b"
                     attempts += 1
                 else:

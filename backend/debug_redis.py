@@ -1,5 +1,5 @@
-"""Run this to diagnose the Upstash lpush issue."""
 import os
+
 from dotenv import load_dotenv
 from upstash_redis import Redis
 
