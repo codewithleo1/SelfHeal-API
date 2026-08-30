@@ -54,15 +54,22 @@ def _extract_search_keyword(endpoint: str, vendor: str) -> str:
     return vendor.lower().replace(" ", "_")
 
 
-def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) -> list[dict]:
-    headers = {
+def _github_headers(github_token: str) -> dict:
+    return {
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+
+
+def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) -> list[dict]:
     params = {"q": f"{keyword} repo:{owner}/{repo}", "per_page": 5}
     with httpx.Client(timeout=15.0) as client:
-        resp = client.get("https://api.github.com/search/code", headers=headers, params=params)
+        resp = client.get(
+            "https://api.github.com/search/code",
+            headers=_github_headers(github_token),
+            params=params,
+        )
     if resp.status_code == 403:
         raise RuntimeError("GitHub search rate limit hit — wait 60 seconds and retry")
     if resp.status_code == 422:
@@ -72,15 +79,43 @@ def _search_github_code(owner: str, repo: str, keyword: str, github_token: str) 
     return [{"path": item["path"], "url": item["git_url"]} for item in items]
 
 
-def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str) -> str:
-    headers = {
-        "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+def _fetch_all_files_via_tree(owner: str, repo: str, github_token: str) -> list[str]:
+    """
+    Use the Git Tree API to get every file path in the repo recursively.
+    This is instant — no indexing delay unlike GitHub Code Search.
+    Returns a list of file paths filtered to code files only.
+    """
+    url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1"
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.get(url, headers=_github_headers(github_token))
+    resp.raise_for_status()
+    data = resp.json()
+
+    # data["tree"] is a flat list of every blob (file) in the repo
+    CODE_EXTENSIONS = {
+        ".py", ".ts", ".js", ".tsx", ".jsx",
+        ".rb", ".go", ".java", ".php", ".cs",
     }
+    paths = []
+    for item in data.get("tree", []):
+        if item.get("type") != "blob":
+            continue
+        path = item["path"]
+        # Skip vendored/generated folders
+        if any(skip in path for skip in ["node_modules/", ".venv/", "dist/", "build/", "__pycache__/"]):
+            continue
+        ext = "." + path.rsplit(".", 1)[-1] if "." in path else ""
+        if ext in CODE_EXTENSIONS:
+            paths.append(path)
+
+    print(f"[search] Tree API found {len(paths)} code files in {owner}/{repo}")
+    return paths
+
+
+def _fetch_file_content(owner: str, repo: str, file_path: str, github_token: str) -> str:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
     with httpx.Client(timeout=15.0) as client:
-        resp = client.get(url, headers=headers)
+        resp = client.get(url, headers=_github_headers(github_token))
     resp.raise_for_status()
     content_type = resp.headers.get("content-type", "")
     if "application/json" not in content_type:
@@ -105,6 +140,29 @@ def _find_function_in_file(file_content: str, hint: str, llm: LLMClient) -> dict
         return {"function_name": None, "confidence": 0.0, "reasoning": "LLM parse error"}
 
 
+def _rank_candidates_by_vendor(paths: list[str], vendor: str, keyword: str) -> list[str]:
+    """
+    Rank file paths so vendor-relevant files come first.
+    Avoids scanning unrelated files and wasting LLM calls.
+    """
+    vendor_lower = vendor.lower()
+    keyword_lower = keyword.lower()
+
+    def score(path: str) -> int:
+        p = path.lower()
+        if vendor_lower in p and "client" in p:
+            return 0   # best: e.g. stripe_client.py
+        if vendor_lower in p:
+            return 1   # e.g. stripe_webhook.py
+        if keyword_lower in p:
+            return 2   # e.g. payment_service.py
+        if "client" in p or "api" in p or "service" in p:
+            return 3   # generic API files
+        return 4        # everything else
+
+    return sorted(paths, key=score)
+
+
 def search(
     repo_url: str,
     endpoint: str,
@@ -115,6 +173,10 @@ def search(
 ) -> dict:
     """
     Search a GitHub repo for the file and function that calls a failing endpoint.
+
+    Strategy:
+    1. Try GitHub Code Search (fast when indexed)
+    2. Fall back to GitHub Tree API (instant, works on all repos regardless of indexing)
 
     Returns:
         dict with file_path, function_name, match_score
@@ -133,41 +195,35 @@ def search(
     else:
         keyword = failing_field or vendor.lower()
 
+    # ── Step 1: Try GitHub Code Search ──────────────────────────────────────
+    candidates: list[dict] = []
     try:
         candidates = _search_github_code(owner, repo, keyword, github_token)
+        print(f"[search] Code Search found {len(candidates)} candidates for '{keyword}'")
     except RuntimeError as e:
-        candidates = []
-        print(f"[search] GitHub search failed: {e}")
+        print(f"[search] GitHub Code Search failed: {e}")
 
+    # ── Step 2: Fall back to GitHub Tree API if Code Search returned nothing ─
     if not candidates:
-        print(f"[search] No search results for '{keyword}', scanning repo files directly")
+        print(f"[search] Falling back to GitHub Tree API for {owner}/{repo}")
         try:
-            headers = {
-                "Authorization": f"Bearer {github_token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            }
-            with httpx.Client(timeout=15.0) as client:
-                resp = client.get(
-                    f"https://api.github.com/repos/{owner}/{repo}/contents",
-                    headers=headers,
-                )
-            resp.raise_for_status()
-            all_files = [f["path"] for f in resp.json() if f["type"] == "file" and f["path"].endswith(".py")]
-            print(f"[search] Found {len(all_files)} Python files: {all_files}")
-            candidates = [{"path": f, "url": ""} for f in all_files]
+            all_paths = _fetch_all_files_via_tree(owner, repo, github_token)
+            # Rank so vendor-relevant files are checked first
+            ranked = _rank_candidates_by_vendor(all_paths, vendor, keyword)
+            candidates = [{"path": p, "url": ""} for p in ranked]
         except Exception as e:
-            print(f"[search] Failed to list repo contents: {e}")
+            print(f"[search] Tree API failed: {e}")
             return {"status": "not_found", "reason": f"Could not list repo files: {e}"}
 
     if not candidates:
-        return {"status": "not_found", "reason": f"No Python files found in {owner}/{repo}"}
+        return {"status": "not_found", "reason": f"No code files found in {owner}/{repo}"}
 
+    # ── Step 3: Score each candidate with LLM ───────────────────────────────
     best: dict = {}
     checked = 0
     hint = failing_field or endpoint or keyword
 
-    for candidate in candidates[:5]:
+    for candidate in candidates[:8]:  # check up to 8 files
         checked += 1
         try:
             content = _fetch_file_content(owner, repo, candidate["path"], github_token)
@@ -175,13 +231,16 @@ def search(
             print(f"[search] Could not fetch {candidate['path']}: {e}")
             continue
 
-        if failing_field and failing_field not in content:
-            print(f"[search] Skipping {candidate['path']} — does not contain '{failing_field}'")
+        # Quick pre-filter: skip files that don't mention the vendor or field at all
+        content_lower = content.lower()
+        vendor_lower = vendor.lower()
+        if failing_field and failing_field not in content and vendor_lower not in content_lower:
+            print(f"[search] Skipping {candidate['path']} — no vendor/field match")
             continue
 
         result = _find_function_in_file(content, hint, llm)
         confidence = result.get("confidence", 0.0)
-        print(f"[search] {candidate['path']} -> {result.get('function_name')} ({confidence})")
+        print(f"[search] {candidate['path']} -> {result.get('function_name')} (confidence={confidence})")
 
         if not best or confidence > best.get("match_score", 0.0):
             best = {
@@ -193,6 +252,7 @@ def search(
             }
 
         if confidence >= 0.85:
+            print("[search] High confidence match found — stopping early")
             break
 
     if not best or not best.get("function_name"):
