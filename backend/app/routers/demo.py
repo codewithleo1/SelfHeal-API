@@ -119,6 +119,42 @@ async def reset_broken_file() -> None:
                 detail=f"Failed to reset test file: {put_res.text[:200]}",
             )
 
+async def close_old_demo_prs() -> None:
+    """Close all open selfheal demo PRs on the test repo before each run."""
+    if not AGENT_TOKEN:
+        return
+    headers = {
+        "Authorization": f"Bearer {AGENT_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    async with httpx.AsyncClient() as client:
+        # Get all open PRs
+        res = await client.get(
+            f"https://api.github.com/repos/{TEST_REPO}/pulls",
+            headers=headers,
+            params={"state": "open", "per_page": 20},
+        )
+        if res.status_code != 200:
+            return
+        prs = res.json()
+        for pr in prs:
+            branch = pr.get("head", {}).get("ref", "")
+            if not branch.startswith("selfheal/"):
+                continue
+            pr_number = pr["number"]
+            # Close the PR
+            await client.patch(
+                f"https://api.github.com/repos/{TEST_REPO}/pulls/{pr_number}",
+                headers=headers,
+                json={"state": "closed"},
+            )
+            # Delete the branch
+            await client.delete(
+                f"https://api.github.com/repos/{TEST_REPO}/git/refs/heads/{branch}",
+                headers=headers,
+            )
+            print(f"[demo] Closed PR #{pr_number} and deleted branch {branch}")
 
 # ── create job row in Supabase ───────────────────────────────────────────────
 async def create_demo_job(job_id: str) -> None:
@@ -153,6 +189,9 @@ async def run_demo(request: Request):
             status_code=429,
             detail="Demo is rate-limited to once per 10 minutes. Try again shortly.",
         )
+
+    # 0. Close old demo PRs to keep test repo clean
+    await close_old_demo_prs()
 
     # 2. Reset the broken file
     await reset_broken_file()
